@@ -31,27 +31,23 @@ logger = logging.getLogger(__name__)
 
 
 class BaseProviderAdapter(LLMProviderAdapter, ABC):
-    """
-    Clase base reutilizable para todos los adapters.
-
-    Centraliza:
-    - conversión de NormalizedMessage a mensajes LangChain
-      (incluyendo AIMessage con tool_calls y ToolMessage)
-    - binding de herramientas al modelo
-    - extracción de texto, uso de tokens y tool_calls
-    - normalización de excepciones
-    - logging estructurado de cada invocación
-    - implementación genérica de complete() y stream()
-    """
 
     provider_code: ClassVar[str]
 
     def __init__(self, factory: LangChainChatModelFactory) -> None:
         self._factory = factory
 
+    # ------------------------------------------------------------------
+    # Método abstracto — cada adapter concreto lo implementa
+    # ------------------------------------------------------------------
+
     @abstractmethod
     def _build_chat_model(self, request: LLMRequest) -> BaseChatModel:
         raise NotImplementedError
+
+    # ------------------------------------------------------------------
+    # Preparación del modelo y los mensajes
+    # ------------------------------------------------------------------
 
     def _prepare_model(self, request: LLMRequest) -> Any:
         model = self._build_chat_model(request)
@@ -62,16 +58,17 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         bind_tools = getattr(model, "bind_tools", None)
         if bind_tools is None:
             raise ProviderError(
-                f"El proveedor '{self.provider_code}' no soporta tool calling en este adapter"
+                f"El proveedor '{self.provider_code}' no soporta tool calling"
             )
 
-        tool_schemas = [self._to_langchain_tool_schema(tool) for tool in request.tools]
+        tool_schemas = [self._to_langchain_tool_schema(t) for t in request.tools]
 
         try:
             if request.tool_choice is not None:
                 return bind_tools(tool_schemas, tool_choice=request.tool_choice)
             return bind_tools(tool_schemas)
         except TypeError:
+            # Algunos providers no aceptan tool_choice → reintentar sin él
             if request.tool_choice is not None:
                 return bind_tools(tool_schemas)
             raise
@@ -82,6 +79,10 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
     def _prepare_messages(self, request: LLMRequest) -> list:
         return self._to_langchain_messages(request.messages)
+
+    # ------------------------------------------------------------------
+    # Conversión de esquemas y mensajes
+    # ------------------------------------------------------------------
 
     def _to_langchain_tool_schema(self, tool: ToolDefinition) -> dict[str, Any]:
         return {
@@ -96,8 +97,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     def _to_langchain_messages(self, messages: list) -> list:
         """
         Convierte NormalizedMessage a mensajes LangChain.
-        Soporta roles: system, user, assistant, tool.
-        Para assistant, también soporta tool_calls.
+        Soporta roles: system, user, assistant (con o sin tool_calls), tool.
         """
         converted = []
 
@@ -115,12 +115,12 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                             content=message.content,
                             tool_calls=[
                                 {
-                                    "id": tool_call.id,
-                                    "name": tool_call.name,
-                                    "args": tool_call.arguments,
+                                    "id": tc.id,
+                                    "name": tc.name,
+                                    "args": tc.arguments,
                                     "type": "tool_call",
                                 }
-                                for tool_call in message.tool_calls
+                                for tc in message.tool_calls
                             ],
                         )
                     )
@@ -133,7 +133,6 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                         "NormalizedMessage con role='tool' requiere tool_call_id. "
                         f"Contenido: {message.content!r}"
                     )
-
                 converted.append(
                     ToolMessage(
                         content=message.content,
@@ -150,25 +149,25 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
         return converted
 
+    # ------------------------------------------------------------------
+    # Extracción de tool_calls de una respuesta completa (complete())
+    # ------------------------------------------------------------------
+
     def _normalize_tool_arguments(self, arguments: Any) -> dict[str, Any]:
         if arguments is None:
             return {}
-
         if isinstance(arguments, dict):
             return arguments
-
         if isinstance(arguments, str):
             try:
                 parsed = json.loads(arguments)
-                if isinstance(parsed, dict):
-                    return parsed
-                return {"value": parsed}
+                return parsed if isinstance(parsed, dict) else {"value": parsed}
             except json.JSONDecodeError:
                 return {"raw": arguments}
-
         return {"value": arguments}
 
     def _extract_tool_calls(self, response: Any) -> list[ToolCall]:
+        """Extrae tool_calls de una respuesta AIMessage completa."""
         raw_tool_calls = getattr(response, "tool_calls", None)
 
         if not raw_tool_calls:
@@ -188,17 +187,13 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
             if isinstance(raw_call, dict):
                 function_payload = raw_call.get("function")
-
                 call_id = raw_call.get("id")
                 name = raw_call.get("name")
-
                 if not name and isinstance(function_payload, dict):
                     name = function_payload.get("name")
-
                 arguments = raw_call.get("args")
                 if arguments is None and isinstance(function_payload, dict):
                     arguments = function_payload.get("arguments")
-
             else:
                 call_id = getattr(raw_call, "id", None)
                 name = getattr(raw_call, "name", None)
@@ -230,6 +225,125 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
         return parsed
 
+    # ------------------------------------------------------------------
+    # Ensamblado de tool_call_chunks durante streaming
+    # ------------------------------------------------------------------
+
+    def _assemble_tool_calls_from_chunks(
+        self,
+        accumulated: dict[int, dict[str, str]],
+    ) -> list[ToolCall]:
+        """
+        Convierte el dict acumulado de chunks de tool_calls en ToolCall completos.
+
+        accumulated tiene la forma:
+            { index: {"id": "...", "name": "...", "args": "..."} }
+
+        donde cada string es la concatenación de todos los chunks recibidos.
+        """
+        result: list[ToolCall] = []
+
+        for idx in sorted(accumulated.keys()):
+            entry = accumulated[idx]
+            name = entry.get("name", "").strip()
+            if not name:
+                logger.warning(
+                    "Se ignoró tool_call_chunk sin nombre provider=%s idx=%d",
+                    self.provider_code,
+                    idx,
+                )
+                continue
+
+            raw_args = entry.get("args", "").strip()
+            arguments = self._normalize_tool_arguments(raw_args or "{}")
+
+            call_id = entry.get("id", "").strip() or f"toolcall_{uuid4().hex}"
+
+            try:
+                result.append(
+                    ToolCall(
+                        id=call_id,
+                        name=name,
+                        arguments=arguments,
+                    )
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Tool call inválido tras ensamblado provider=%s idx=%d error=%s",
+                    self.provider_code,
+                    idx,
+                    exc,
+                )
+
+        return result
+
+    def _process_stream_chunk_for_tool_calls(
+        self,
+        chunk: Any,
+        accumulated: dict[int, dict[str, str]],
+    ) -> None:
+        """
+        Lee los tool_call_chunks de un chunk de streaming y los acumula
+        en el dict `accumulated`, mutándolo en lugar (para no crear objetos
+        intermedios por cada chunk).
+
+        LangChain normaliza los tool_call_chunks en chunk.tool_call_chunks
+        para la mayoría de providers. Para providers que no siguen esta
+        convención, también intentamos additional_kwargs.tool_calls.
+        """
+        # --- Ruta principal: chunk.tool_call_chunks (LangChain normalizado) ---
+        tool_call_chunks = getattr(chunk, "tool_call_chunks", None) or []
+
+        for tc_chunk in tool_call_chunks:
+            if isinstance(tc_chunk, dict):
+                idx = tc_chunk.get("index") or 0
+                call_id = tc_chunk.get("id") or ""
+                name = tc_chunk.get("name") or ""
+                args = tc_chunk.get("args") or ""
+            else:
+                idx = getattr(tc_chunk, "index", 0) or 0
+                call_id = getattr(tc_chunk, "id", "") or ""
+                name = getattr(tc_chunk, "name", "") or ""
+                args = getattr(tc_chunk, "args", "") or ""
+
+            if idx not in accumulated:
+                accumulated[idx] = {"id": "", "name": "", "args": ""}
+
+            accumulated[idx]["id"] += call_id
+            accumulated[idx]["name"] += name
+            accumulated[idx]["args"] += args
+
+        if tool_call_chunks:
+            return  # ya procesado
+
+        # --- Ruta de fallback: additional_kwargs.tool_calls (OpenAI legacy) ---
+        additional_kwargs = getattr(chunk, "additional_kwargs", None)
+        if not isinstance(additional_kwargs, dict):
+            return
+
+        raw_calls = additional_kwargs.get("tool_calls") or []
+        for raw_call in raw_calls:
+            if not isinstance(raw_call, dict):
+                continue
+
+            idx = raw_call.get("index") or 0
+            call_id = raw_call.get("id") or ""
+
+            function_payload = raw_call.get("function") or {}
+            name = function_payload.get("name") or ""
+            args = function_payload.get("arguments") or ""
+
+            if idx not in accumulated:
+                accumulated[idx] = {"id": "", "name": "", "args": ""}
+
+            accumulated[idx]["id"] += call_id
+            accumulated[idx]["name"] += name
+            accumulated[idx]["args"] += args
+
+    # ------------------------------------------------------------------
+    # Extracción de texto y uso de tokens
+    # ------------------------------------------------------------------
+
     def _extract_text(self, content: Any) -> str:
         if content is None:
             return ""
@@ -250,10 +364,6 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         return str(content)
 
     def _extract_usage(self, response: Any) -> TokenUsage | None:
-        """
-        Extrae uso de tokens desde usage_metadata o response_metadata.
-        Calcula total_tokens como fallback cuando el proveedor no lo devuelve.
-        """
         prompt: int | None = None
         completion: int | None = None
         total: int | None = None
@@ -284,25 +394,19 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
             total_tokens=total,
         )
 
-    def _normalize_exception(self, exc: Exception) -> Exception:
-        """
-        Convierte excepciones externas en excepciones de dominio.
+    # ------------------------------------------------------------------
+    # Normalización de excepciones externas
+    # ------------------------------------------------------------------
 
-        Estrategia en dos capas:
-        1. isinstance() por tipo concreto de cada librería.
-        2. fallback por string matching.
-        """
+    def _normalize_exception(self, exc: Exception) -> Exception:
         try:
             import openai
-
             if isinstance(exc, openai.APITimeoutError):
                 return ProviderTimeoutError(f"Timeout invocando proveedor '{self.provider_code}'")
             if isinstance(exc, openai.RateLimitError):
                 return ProviderRateLimitError(f"Rate limit en proveedor '{self.provider_code}'")
             if isinstance(exc, openai.AuthenticationError):
-                return ProviderAuthenticationError(
-                    f"Error de autenticación en proveedor '{self.provider_code}'"
-                )
+                return ProviderAuthenticationError(f"Auth error en proveedor '{self.provider_code}'")
             if isinstance(exc, openai.APIStatusError) and exc.status_code == 503:
                 return ProviderUnavailableError(f"Proveedor '{self.provider_code}' no disponible")
         except ImportError:
@@ -310,15 +414,12 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
         try:
             import anthropic
-
             if isinstance(exc, anthropic.APITimeoutError):
                 return ProviderTimeoutError(f"Timeout invocando proveedor '{self.provider_code}'")
             if isinstance(exc, anthropic.RateLimitError):
                 return ProviderRateLimitError(f"Rate limit en proveedor '{self.provider_code}'")
             if isinstance(exc, anthropic.AuthenticationError):
-                return ProviderAuthenticationError(
-                    f"Error de autenticación en proveedor '{self.provider_code}'"
-                )
+                return ProviderAuthenticationError(f"Auth error en proveedor '{self.provider_code}'")
             if isinstance(exc, anthropic.APIStatusError) and exc.status_code == 503:
                 return ProviderUnavailableError(f"Proveedor '{self.provider_code}' no disponible")
         except ImportError:
@@ -326,20 +427,18 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
         try:
             from google.api_core import exceptions as google_exc
-
             if isinstance(exc, google_exc.DeadlineExceeded):
                 return ProviderTimeoutError(f"Timeout invocando proveedor '{self.provider_code}'")
             if isinstance(exc, google_exc.ResourceExhausted):
                 return ProviderRateLimitError(f"Rate limit en proveedor '{self.provider_code}'")
             if isinstance(exc, google_exc.Unauthenticated):
-                return ProviderAuthenticationError(
-                    f"Error de autenticación en proveedor '{self.provider_code}'"
-                )
+                return ProviderAuthenticationError(f"Auth error en proveedor '{self.provider_code}'")
             if isinstance(exc, google_exc.ServiceUnavailable):
                 return ProviderUnavailableError(f"Proveedor '{self.provider_code}' no disponible")
         except ImportError:
             pass
 
+        # Fallback por string matching
         name = exc.__class__.__name__.lower()
         message = str(exc).lower()
 
@@ -348,13 +447,15 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         if "rate" in name or "429" in message:
             return ProviderRateLimitError(f"Rate limit en proveedor '{self.provider_code}'")
         if "auth" in name or "401" in message or "api key" in message or "permission" in message:
-            return ProviderAuthenticationError(
-                f"Error de autenticación en proveedor '{self.provider_code}'"
-            )
+            return ProviderAuthenticationError(f"Auth error en proveedor '{self.provider_code}'")
         if "503" in message or "unavailable" in message:
             return ProviderUnavailableError(f"Proveedor '{self.provider_code}' no disponible")
 
         return ProviderError(f"Error invocando proveedor '{self.provider_code}'")
+
+    # ------------------------------------------------------------------
+    # complete() — invocación sin streaming
+    # ------------------------------------------------------------------
 
     async def complete(self, request: LLMRequest) -> LLMCompletionResult:
         model = self._prepare_model(request)
@@ -420,13 +521,27 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
             )
             raise self._normalize_exception(exc) from exc
 
+    # ------------------------------------------------------------------
+    # stream() — streaming con soporte completo de tool calling
+    # ------------------------------------------------------------------
+
     async def stream(self, request: LLMRequest) -> AsyncGenerator[LLMStreamEvent, None]:
         """
-        _prepare_model y _prepare_messages se ejecutan ANTES del try/except
-        para que errores de configuración, roles inválidos o tool binding
-        se propaguen como excepciones normales y no como eventos ERROR del stream.
+        Streaming con soporte completo de tool calling.
 
-        En esta fase 1, stream() no implementa tool calling completo.
+        Protocolo de eventos emitidos:
+          START  → indica inicio de turno del asistente
+          DELTA  → fragmento de texto (puede haber 0 DELTAs si el turno es puro tool_use)
+          TOOL_USE → el modelo solicitó tools; tool_calls contiene los calls ensamblados
+          END    → fin del turno (siempre el último evento)
+          ERROR  → error de proveedor (el stream se detiene)
+
+        El consumidor (ConversationService.stream_message) maneja el evento
+        TOOL_USE ejecutando las herramientas y relanzando el stream en un loop.
+
+        Nota: _prepare_model y _prepare_messages se ejecutan ANTES del try/except
+        para que errores de configuración (API key, binding de tools, roles
+        inválidos) se propaguen como excepciones normales y no como eventos ERROR.
         """
         model = self._prepare_model(request)
         messages = self._prepare_messages(request)
@@ -441,11 +556,46 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
         yield LLMStreamEvent(type=StreamEventType.START)
 
+        # Dict para acumular los tool_call_chunks fragmentados.
+        # Clave: índice del tool_call (int)
+        # Valor: {"id": str, "name": str, "args": str}
+        accumulated_tool_calls: dict[int, dict[str, str]] = {}
+
         try:
             async for chunk in model.astream(messages):
+                # 1. Acumular tool_call_chunks (si los hay)
+                self._process_stream_chunk_for_tool_calls(chunk, accumulated_tool_calls)
+
+                # 2. Emitir delta de texto si existe
                 delta = self._extract_text(getattr(chunk, "content", None))
                 if delta:
                     yield LLMStreamEvent(type=StreamEventType.DELTA, delta=delta)
+
+            # ---- Fin del stream crudo del provider ----
+
+            if accumulated_tool_calls:
+                # El modelo solicitó herramientas. Ensamblar y emitir TOOL_USE.
+                tool_calls = self._assemble_tool_calls_from_chunks(accumulated_tool_calls)
+
+                if tool_calls:
+                    logger.debug(
+                        "stream() TOOL_USE provider=%s model=%s calls=%d",
+                        self.provider_code,
+                        request.model_key,
+                        len(tool_calls),
+                    )
+                    yield LLMStreamEvent(
+                        type=StreamEventType.TOOL_USE,
+                        tool_calls=tool_calls,
+                    )
+                else:
+                    # Los chunks llegaron pero no pudieron ensamblarse
+                    logger.warning(
+                        "stream() tool_call_chunks recibidos pero no ensamblados "
+                        "provider=%s model=%s",
+                        self.provider_code,
+                        request.model_key,
+                    )
 
             logger.debug(
                 "stream() END provider=%s model=%s",

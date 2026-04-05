@@ -23,13 +23,6 @@ from app.tools.registry import ToolRegistry
 
 
 class ConversationService:
-    """
-    Servicio conversacional multiproveedor.
-
-    En esta fase 1:
-    - send_message() soporta tool calling completo
-    - stream_message() NO soporta tool calling todavía
-    """
 
     def __init__(
         self,
@@ -70,7 +63,6 @@ class ConversationService:
             raise InvalidProviderSelectionError(
                 f"No hay adapter registrado para provider '{provider_code}'"
             )
-
         return await self._repository.create(
             provider_code=provider_code,
             model_key=model_key,
@@ -94,7 +86,6 @@ class ConversationService:
             raise InvalidProviderSelectionError(
                 "Si cambias provider_code, debes indicar también model_key"
             )
-
         if provider_code is not None and not self._provider_registry.has(provider_code):
             raise InvalidProviderSelectionError(
                 f"No hay adapter registrado para provider '{provider_code}'"
@@ -105,6 +96,10 @@ class ConversationService:
         await self._repository.save(session)
         return session
 
+    # ------------------------------------------------------------------
+    # send_message() — modo no-streaming con tool loop completo
+    # ------------------------------------------------------------------
+
     async def send_message(
         self,
         *,
@@ -114,6 +109,14 @@ class ConversationService:
         model_key: str | None = None,
         tool_names: list[str] | None = None,
     ) -> LLMCompletionResult:
+        """
+        Envía un mensaje y espera la respuesta completa.
+
+        tool_names:
+          - None    → usa todas las tools registradas (si hay alguna)
+          - []      → no envía tools al modelo
+          - [names] → solo esas tools
+        """
         tool_definitions = self._resolve_tool_definitions(tool_names)
 
         session = await self._prepare_session(
@@ -124,11 +127,7 @@ class ConversationService:
         )
 
         for iteration in range(self._max_tool_iterations + 1):
-            request = self._build_request(
-                session=session,
-                tool_definitions=tool_definitions,
-            )
-
+            request = self._build_request(session=session, tool_definitions=tool_definitions)
             result = await self._orchestrator.complete(request)
 
             session.add_assistant_message(
@@ -146,12 +145,8 @@ class ConversationService:
                 raise ToolLoopLimitExceededError(self._max_tool_iterations)
 
             execution_context = self._build_tool_execution_context(session)
-
             for tool_call in result.tool_calls:
-                tool_result = await self._tool_executor.execute_call(
-                    tool_call,
-                    execution_context,
-                )
+                tool_result = await self._tool_executor.execute_call(tool_call, execution_context)
                 session.add_tool_message(
                     tool_result.content,
                     tool_call_id=tool_result.tool_call_id,
@@ -162,6 +157,10 @@ class ConversationService:
 
         raise ToolLoopLimitExceededError(self._max_tool_iterations)
 
+    # ------------------------------------------------------------------
+    # stream_message() — modo streaming con tool loop completo
+    # ------------------------------------------------------------------
+
     async def stream_message(
         self,
         *,
@@ -171,10 +170,30 @@ class ConversationService:
         model_key: str | None = None,
         tool_names: list[str] | None = None,
     ) -> AsyncGenerator[LLMStreamEvent, None]:
-        if tool_names:
-            raise NotImplementedError(
-                "Tool calling no está soportado en stream_message() durante la fase 1"
-            )
+        """
+        Envía un mensaje en modo streaming con tool calling completo.
+
+        Protocolo de eventos que el consumidor externo recibe:
+
+          START        → inicio del primer turno del asistente
+          DELTA        → fragmento de texto (0..N por turno)
+          TOOL_NOTIFY  → notificación informativa de que el modelo llamó a tools
+                         (evento especial emitido por el servicio, no por el adapter)
+          START        → inicio de turno siguiente (si hubo tools y el modelo
+                         continúa respondiendo)
+          DELTA        → más texto
+          END          → fin definitivo
+
+        El consumidor NO necesita manejar el loop: el servicio lo gestiona
+        internamente. Recibe un stream unificado independientemente de cuántas
+        iteraciones de tool calling hayan ocurrido.
+
+        tool_names:
+          - None    → usa todas las tools registradas (si hay alguna)
+          - []      → no envía tools al modelo
+          - [names] → solo esas tools
+        """
+        tool_definitions = self._resolve_tool_definitions(tool_names)
 
         session = await self._prepare_session(
             conversation_id=conversation_id,
@@ -183,39 +202,161 @@ class ConversationService:
             model_key=model_key,
         )
 
-        request = self._build_request(
+        return self._stream_generator(
             session=session,
-            tool_definitions=[],
+            tool_definitions=tool_definitions,
         )
 
-        async def generator() -> AsyncGenerator[LLMStreamEvent, None]:
-            chunks: list[str] = []
+    # ------------------------------------------------------------------
+    # Generador interno del stream (gestiona el loop de tool calling)
+    # ------------------------------------------------------------------
+
+    async def _stream_generator(
+        self,
+        *,
+        session: ConversationSession,
+        tool_definitions: list[ToolDefinition],
+    ) -> AsyncGenerator[LLMStreamEvent, None]:
+        """
+        Generador que maneja el loop completo de streaming + tool calling.
+
+        Por cada iteración:
+          1. Construye el request con el historial actualizado.
+          2. Abre el stream del adapter.
+          3. Propaga los DELTA al consumidor.
+          4. Si recibe TOOL_USE:
+             a. Guarda el mensaje assistant con los tool_calls en la sesión.
+             b. Ejecuta las tools y guarda los resultados.
+             c. Emite un evento de notificación al consumidor (TOOL_NOTIFY).
+             d. Inicia la siguiente iteración (loop).
+          5. Al recibir END sin tool_calls previos, guarda el mensaje assistant
+             con el texto acumulado y termina.
+        """
+        for iteration in range(self._max_tool_iterations + 1):
+            request = self._build_request(session=session, tool_definitions=tool_definitions)
+
+            accumulated_text: list[str] = []
+            tool_calls_this_turn: list = []
+            got_tool_use = False
+            got_error = False
 
             async for event in self._orchestrator.stream(request):
-                if event.type == StreamEventType.DELTA and event.delta:
-                    chunks.append(event.delta)
-                    yield event
-                    continue
 
-                if event.type == StreamEventType.ERROR:
+                if event.type == StreamEventType.START:
+                    # Propagar siempre para que el consumidor sepa que
+                    # hay un nuevo turno del asistente (útil en UIs).
                     yield event
-                    return
 
-                if event.type == StreamEventType.END:
-                    final_text = "".join(chunks)
-                    if final_text:
+                elif event.type == StreamEventType.DELTA:
+                    if event.delta:
+                        accumulated_text.append(event.delta)
+                    yield event
+
+                elif event.type == StreamEventType.TOOL_USE:
+                    # El modelo solicitó tools. Guardar los tool_calls
+                    # para procesarlos al finalizar el turno.
+                    tool_calls_this_turn = event.tool_calls
+                    got_tool_use = True
+                    # No re-emitimos TOOL_USE al consumidor externo;
+                    # en su lugar emitiremos un TOOL_NOTIFY más informativo
+                    # una vez que hayamos ejecutado las tools.
+
+                elif event.type == StreamEventType.END:
+                    final_text = "".join(accumulated_text)
+
+                    if got_tool_use and tool_calls_this_turn:
+                        # ----- Turno con tool calling -----
+                        # 1. Persistir el mensaje assistant con tool_calls
                         session.add_assistant_message(
                             final_text,
                             provider_code=session.current_provider_code,
                             model_key=session.current_model_key,
+                            tool_calls=tool_calls_this_turn,
                         )
                         await self._repository.save(session)
+
+                        # 2. Verificar límite de iteraciones
+                        if iteration >= self._max_tool_iterations:
+                            yield LLMStreamEvent(
+                                type=StreamEventType.ERROR,
+                                error_code="tool_loop_limit_exceeded",
+                                error_message=(
+                                    f"Se alcanzó el máximo de iteraciones de "
+                                    f"tool calling ({self._max_tool_iterations})"
+                                ),
+                            )
+                            return
+
+                        # 3. Ejecutar tools y persistir resultados
+                        execution_context = self._build_tool_execution_context(session)
+                        executed_tools: list[dict] = []
+
+                        for tool_call in tool_calls_this_turn:
+                            tool_result = await self._tool_executor.execute_call(
+                                tool_call, execution_context
+                            )
+                            session.add_tool_message(
+                                tool_result.content,
+                                tool_call_id=tool_result.tool_call_id,
+                                name=tool_result.name,
+                            )
+                            executed_tools.append(
+                                {
+                                    "tool_call_id": tool_result.tool_call_id,
+                                    "name": tool_result.name,
+                                    "content": tool_result.content,
+                                    "is_error": tool_result.is_error,
+                                }
+                            )
+
+                        await self._repository.save(session)
+
+                        # 4. Notificar al consumidor sobre las tools ejecutadas
+                        yield LLMStreamEvent(
+                            type=StreamEventType.TOOL_USE,
+                            tool_calls=tool_calls_this_turn,
+                            raw_event={"executed_tools": executed_tools},
+                        )
+
+                        # 5. Continuar el loop — el break sale del for interno
+                        # y la iteración del while continúa
+                        break
+
+                    else:
+                        # ----- Turno final (solo texto) -----
+                        if final_text:
+                            session.add_assistant_message(
+                                final_text,
+                                provider_code=session.current_provider_code,
+                                model_key=session.current_model_key,
+                            )
+                            await self._repository.save(session)
+
+                        yield LLMStreamEvent(type=StreamEventType.END)
+                        return
+
+                elif event.type == StreamEventType.ERROR:
+                    got_error = True
                     yield event
                     return
 
-                yield event
+            # Si salimos del for por break (hubo tool_use), la iteración continúa.
+            # Si no hubo tool_use y no hubo error pero tampoco END, algo fue mal.
+            if not got_tool_use and not got_error:
+                # Salvaguarda: el stream terminó sin END ni TOOL_USE
+                final_text = "".join(accumulated_text)
+                if final_text:
+                    session.add_assistant_message(
+                        final_text,
+                        provider_code=session.current_provider_code,
+                        model_key=session.current_model_key,
+                    )
+                    await self._repository.save(session)
+                yield LLMStreamEvent(type=StreamEventType.END)
+                return
 
-        return generator()
+        # Agotamos las iteraciones sin llegar a un END limpio
+        raise ToolLoopLimitExceededError(self._max_tool_iterations)
 
     # ------------------------------------------------------------------
     # Helpers privados
@@ -242,23 +383,29 @@ class ConversationService:
                     f"No hay adapter registrado para provider '{provider_code}'"
                 )
             session.switch_model(provider_code=provider_code, model_key=model_key)
-
         elif model_key is not None:
             session.switch_model(model_key=model_key)
 
         session.add_user_message(user_text)
         await self._repository.save(session)
-
         return session
 
     def _resolve_tool_definitions(
         self,
         tool_names: list[str] | None,
     ) -> list[ToolDefinition]:
-        if tool_names is not None:
-            return self._tool_registry.list_definitions(tool_names)
+        """
+        Resuelve las tool definitions a enviar al modelo.
 
-        return self._tool_registry.list_definitions()
+        - tool_names=None  → todas las tools registradas
+        - tool_names=[]    → sin tools (lista vacía explícita)
+        - tool_names=[...] → solo las tools indicadas
+        """
+        if tool_names is None:
+            return self._tool_registry.list_definitions()
+
+        # lista explícita (puede ser vacía)
+        return self._tool_registry.list_definitions(tool_names)
 
     def _build_tool_execution_context(
         self,
@@ -279,12 +426,9 @@ class ConversationService:
     ) -> LLMRequest:
         resolved_tools = list(tool_definitions or [])
 
-        metadata: dict[str, Any] = {
-            "conversation_id": str(session.id),
-        }
-
+        metadata: dict[str, Any] = {"conversation_id": str(session.id)}
         if resolved_tools:
-            metadata["tool_names"] = [tool.name for tool in resolved_tools]
+            metadata["tool_names"] = [t.name for t in resolved_tools]
 
         return LLMRequest(
             provider_code=session.current_provider_code,
