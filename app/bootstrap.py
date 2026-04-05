@@ -1,3 +1,4 @@
+# app/bootstrap.py
 from dataclasses import dataclass
 
 from app.conversation.context_builder import SimpleContextBuilder
@@ -14,6 +15,7 @@ from app.llm.orchestrator import LLMOrchestrator
 from app.llm.registry import ProviderRegistry
 from app.tools.builtin import register_builtin_tools
 from app.tools.executor import ToolExecutor
+from app.tools.loader import load_custom_tools       # ← NUEVO
 from app.tools.registry import ToolRegistry
 
 
@@ -69,7 +71,21 @@ def build_container(
     max_context_messages: int | None = None,
     default_config: LLMRequestConfig | None = None,
     with_builtin_tools: bool = False,
+    with_custom_tools: bool = True,              # ← NUEVO (activo por defecto)
 ) -> AppContainer:
+    """
+    Construye el contenedor principal de la aplicación.
+
+    Parámetros de tools:
+        with_builtin_tools:
+            Registra las tools integradas (get_current_utc_time, sum_numbers).
+            Default: False (para no romper comportamiento anterior).
+
+        with_custom_tools:
+            Descubre y registra automáticamente todas las tools en
+            app/tools/custom/. Default: True.
+            Pasa False en tests unitarios donde no quieras cargar tools externas.
+    """
     resolved_settings = settings or get_settings()
     registry = build_registry(resolved_settings)
 
@@ -92,8 +108,15 @@ def build_container(
     orchestrator = LLMOrchestrator(registry)
 
     tool_registry = ToolRegistry()
+
+    # Orden de registro: builtin primero, custom después.
+    # Si una tool builtin y una custom tienen el mismo nombre,
+    # la custom NO sobreescribe (el registry lanza ValueError en duplicados).
     if with_builtin_tools:
         register_builtin_tools(tool_registry)
+
+    if with_custom_tools:
+        load_custom_tools(tool_registry)
 
     tool_executor = ToolExecutor(tool_registry)
 
