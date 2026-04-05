@@ -5,3 +5,4 @@ langchain-anthropic==1.4.0
 langchain-google-genai==4.2.1
 langchain-openai==1.1.12
 langchain-xai==1.2.2
+gitingest==0.3.1
