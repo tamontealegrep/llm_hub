@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Literal
 
+from app.tools.contracts import ToolCall, ToolDefinition
+
 
 @dataclass(frozen=True, slots=True)
 class NormalizedMessage:
@@ -14,14 +16,15 @@ class NormalizedMessage:
     - "assistant" → respuesta del modelo
     - "tool"      → resultado de una herramienta (requiere tool_call_id)
 
-    Validación temprana: si role="tool" y no hay tool_call_id, falla en construcción
-    en lugar de propagar el error hasta _to_langchain_messages.
+    Además, un mensaje "assistant" puede incluir tool_calls cuando el modelo
+    solicita la ejecución de una o varias herramientas.
     """
 
     role: Literal["system", "user", "assistant", "tool"]
     content: str
-    tool_call_id: str | None = None  # requerido cuando role == "tool"
-    name: str | None = None          # nombre de la herramienta (para trazabilidad)
+    tool_call_id: str | None = None
+    name: str | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.role == "tool" and not self.tool_call_id:
@@ -29,6 +32,21 @@ class NormalizedMessage:
                 "NormalizedMessage con role='tool' requiere tool_call_id. "
                 f"Contenido recibido: {self.content!r}"
             )
+
+        if self.role != "tool" and self.tool_call_id is not None:
+            raise ValueError(
+                "Solo los mensajes con role='tool' pueden incluir tool_call_id. "
+                f"Role recibido: {self.role!r}"
+            )
+
+        if self.tool_calls and self.role != "assistant":
+            raise ValueError(
+                "Solo los mensajes con role='assistant' pueden incluir tool_calls. "
+                f"Role recibido: {self.role!r}"
+            )
+
+        if any(not isinstance(tool_call, ToolCall) for tool_call in self.tool_calls):
+            raise ValueError("tool_calls debe contener instancias de ToolCall")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +64,8 @@ class LLMRequest:
     messages: list[NormalizedMessage]
     config: LLMRequestConfig
     metadata: dict[str, Any] = field(default_factory=dict)
+    tools: list[ToolDefinition] = field(default_factory=list)
+    tool_choice: str | dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +82,11 @@ class LLMCompletionResult:
     usage: TokenUsage | None = None
     provider_request_id: str | None = None
     raw_response: dict[str, Any] | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if any(not isinstance(tool_call, ToolCall) for tool_call in self.tool_calls):
+            raise ValueError("tool_calls debe contener instancias de ToolCall")
 
 
 class StreamEventType(str, Enum):

@@ -12,12 +12,16 @@ from app.llm.contracts import LLMRequestConfig
 from app.llm.factory import LangChainChatModelFactory
 from app.llm.orchestrator import LLMOrchestrator
 from app.llm.registry import ProviderRegistry
+from app.tools.builtin import register_builtin_tools
+from app.tools.executor import ToolExecutor
+from app.tools.registry import ToolRegistry
 
 
 @dataclass(frozen=True, slots=True)
 class AppContainer:
     settings: Settings
     registry: ProviderRegistry
+    tool_registry: ToolRegistry
     service: ConversationService
 
 
@@ -64,6 +68,7 @@ def build_container(
     settings: Settings | None = None,
     max_context_messages: int | None = None,
     default_config: LLMRequestConfig | None = None,
+    with_builtin_tools: bool = False,
 ) -> AppContainer:
     resolved_settings = settings or get_settings()
     registry = build_registry(resolved_settings)
@@ -86,16 +91,26 @@ def build_container(
     context_builder = SimpleContextBuilder(max_messages=max_context_messages)
     orchestrator = LLMOrchestrator(registry)
 
+    tool_registry = ToolRegistry()
+    if with_builtin_tools:
+        register_builtin_tools(tool_registry)
+
+    tool_executor = ToolExecutor(tool_registry)
+
     service = ConversationService(
         repository=repository,
         context_builder=context_builder,
         orchestrator=orchestrator,
         provider_registry=registry,
+        tool_registry=tool_registry,
+        tool_executor=tool_executor,
         default_config=resolved_default_config,
+        max_tool_iterations=resolved_settings.default_max_tool_iterations,
     )
 
     return AppContainer(
         settings=resolved_settings,
         registry=registry,
+        tool_registry=tool_registry,
         service=service,
     )

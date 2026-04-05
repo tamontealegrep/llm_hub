@@ -1,7 +1,9 @@
+import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from typing import Any, ClassVar
+from uuid import uuid4
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -23,6 +25,7 @@ from app.llm.contracts import (
 )
 from app.llm.factory import LangChainChatModelFactory
 from app.llm.interfaces import LLMProviderAdapter
+from app.tools.contracts import ToolCall, ToolDefinition
 
 logger = logging.getLogger(__name__)
 
@@ -32,9 +35,11 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     Clase base reutilizable para todos los adapters.
 
     Centraliza:
-    - conversión de NormalizedMessage a mensajes LangChain (incluyendo ToolMessage)
-    - extracción de texto y uso de tokens
-    - normalización de excepciones (primero por tipo concreto, luego por string)
+    - conversión de NormalizedMessage a mensajes LangChain
+      (incluyendo AIMessage con tool_calls y ToolMessage)
+    - binding de herramientas al modelo
+    - extracción de texto, uso de tokens y tool_calls
+    - normalización de excepciones
     - logging estructurado de cada invocación
     - implementación genérica de complete() y stream()
     """
@@ -48,14 +53,51 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     def _build_chat_model(self, request: LLMRequest) -> BaseChatModel:
         raise NotImplementedError
 
+    def _prepare_model(self, request: LLMRequest) -> Any:
+        model = self._build_chat_model(request)
+
+        if not request.tools:
+            return model
+
+        bind_tools = getattr(model, "bind_tools", None)
+        if bind_tools is None:
+            raise ProviderError(
+                f"El proveedor '{self.provider_code}' no soporta tool calling en este adapter"
+            )
+
+        tool_schemas = [self._to_langchain_tool_schema(tool) for tool in request.tools]
+
+        try:
+            if request.tool_choice is not None:
+                return bind_tools(tool_schemas, tool_choice=request.tool_choice)
+            return bind_tools(tool_schemas)
+        except TypeError:
+            if request.tool_choice is not None:
+                return bind_tools(tool_schemas)
+            raise
+        except NotImplementedError as exc:
+            raise ProviderError(
+                f"El proveedor '{self.provider_code}' no soporta tool calling"
+            ) from exc
+
     def _prepare_messages(self, request: LLMRequest) -> list:
         return self._to_langchain_messages(request.messages)
+
+    def _to_langchain_tool_schema(self, tool: ToolDefinition) -> dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.input_schema,
+            },
+        }
 
     def _to_langchain_messages(self, messages: list) -> list:
         """
         Convierte NormalizedMessage a mensajes LangChain.
         Soporta roles: system, user, assistant, tool.
-        Falla explícitamente para roles desconocidos.
+        Para assistant, también soporta tool_calls.
         """
         converted = []
 
@@ -67,16 +109,31 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 converted.append(HumanMessage(content=message.content))
 
             elif message.role == "assistant":
-                converted.append(AIMessage(content=message.content))
+                if message.tool_calls:
+                    converted.append(
+                        AIMessage(
+                            content=message.content,
+                            tool_calls=[
+                                {
+                                    "id": tool_call.id,
+                                    "name": tool_call.name,
+                                    "args": tool_call.arguments,
+                                    "type": "tool_call",
+                                }
+                                for tool_call in message.tool_calls
+                            ],
+                        )
+                    )
+                else:
+                    converted.append(AIMessage(content=message.content))
 
             elif message.role == "tool":
-                # tool_call_id ya fue validado en NormalizedMessage.__post_init__,
-                # pero la comprobación aquí actúa como segunda línea de defensa.
                 if not message.tool_call_id:
                     raise ValueError(
                         "NormalizedMessage con role='tool' requiere tool_call_id. "
                         f"Contenido: {message.content!r}"
                     )
+
                 converted.append(
                     ToolMessage(
                         content=message.content,
@@ -92,6 +149,86 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 )
 
         return converted
+
+    def _normalize_tool_arguments(self, arguments: Any) -> dict[str, Any]:
+        if arguments is None:
+            return {}
+
+        if isinstance(arguments, dict):
+            return arguments
+
+        if isinstance(arguments, str):
+            try:
+                parsed = json.loads(arguments)
+                if isinstance(parsed, dict):
+                    return parsed
+                return {"value": parsed}
+            except json.JSONDecodeError:
+                return {"raw": arguments}
+
+        return {"value": arguments}
+
+    def _extract_tool_calls(self, response: Any) -> list[ToolCall]:
+        raw_tool_calls = getattr(response, "tool_calls", None)
+
+        if not raw_tool_calls:
+            additional_kwargs = getattr(response, "additional_kwargs", None)
+            if isinstance(additional_kwargs, dict):
+                raw_tool_calls = additional_kwargs.get("tool_calls")
+
+        if not raw_tool_calls:
+            return []
+
+        parsed: list[ToolCall] = []
+
+        for raw_call in raw_tool_calls:
+            call_id: Any = None
+            name: Any = None
+            arguments: Any = None
+
+            if isinstance(raw_call, dict):
+                function_payload = raw_call.get("function")
+
+                call_id = raw_call.get("id")
+                name = raw_call.get("name")
+
+                if not name and isinstance(function_payload, dict):
+                    name = function_payload.get("name")
+
+                arguments = raw_call.get("args")
+                if arguments is None and isinstance(function_payload, dict):
+                    arguments = function_payload.get("arguments")
+
+            else:
+                call_id = getattr(raw_call, "id", None)
+                name = getattr(raw_call, "name", None)
+                arguments = getattr(raw_call, "args", None)
+
+            if not name:
+                logger.warning(
+                    "Se ignoró un tool_call sin nombre provider=%s raw=%r",
+                    self.provider_code,
+                    raw_call,
+                )
+                continue
+
+            try:
+                parsed.append(
+                    ToolCall(
+                        id=str(call_id or f"toolcall_{uuid4().hex}"),
+                        name=str(name),
+                        arguments=self._normalize_tool_arguments(arguments),
+                    )
+                )
+            except ValueError as exc:
+                logger.warning(
+                    "Tool call inválido provider=%s raw=%r error=%s",
+                    self.provider_code,
+                    raw_call,
+                    exc,
+                )
+
+        return parsed
 
     def _extract_text(self, content: Any) -> str:
         if content is None:
@@ -152,11 +289,9 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         Convierte excepciones externas en excepciones de dominio.
 
         Estrategia en dos capas:
-        1. isinstance() por tipo concreto de cada librería (robusto ante cambios de mensajes).
-        2. Fallback por string matching en nombre de clase y mensaje (para proveedores
-           sin librería tipada o sin tipos de excepción granulares).
+        1. isinstance() por tipo concreto de cada librería.
+        2. fallback por string matching.
         """
-        # --- Capa 1: tipos concretos de openai (OpenAI y xAI) ---
         try:
             import openai
 
@@ -173,7 +308,6 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         except ImportError:
             pass
 
-        # --- Capa 1: tipos concretos de anthropic ---
         try:
             import anthropic
 
@@ -190,7 +324,6 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         except ImportError:
             pass
 
-        # --- Capa 1: tipos concretos de google-api-core ---
         try:
             from google.api_core import exceptions as google_exc
 
@@ -207,7 +340,6 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         except ImportError:
             pass
 
-        # --- Capa 2: fallback por string ---
         name = exc.__class__.__name__.lower()
         message = str(exc).lower()
 
@@ -225,26 +357,39 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
         return ProviderError(f"Error invocando proveedor '{self.provider_code}'")
 
     async def complete(self, request: LLMRequest) -> LLMCompletionResult:
-        model = self._build_chat_model(request)
+        model = self._prepare_model(request)
         messages = self._prepare_messages(request)
 
         logger.debug(
-            "complete() provider=%s model=%s mensajes=%d",
+            "complete() provider=%s model=%s mensajes=%d tools=%d",
             self.provider_code,
             request.model_key,
             len(messages),
+            len(request.tools),
         )
 
         try:
             response = await model.ainvoke(messages)
             response_metadata = getattr(response, "response_metadata", None)
+            additional_kwargs = getattr(response, "additional_kwargs", None)
+
             usage = self._extract_usage(response)
+            tool_calls = self._extract_tool_calls(response)
+
+            raw_response: dict[str, Any] | None = None
+            if isinstance(response_metadata, dict) or isinstance(additional_kwargs, dict):
+                raw_response = {}
+                if isinstance(response_metadata, dict):
+                    raw_response["response_metadata"] = response_metadata
+                if isinstance(additional_kwargs, dict):
+                    raw_response["additional_kwargs"] = additional_kwargs
 
             logger.debug(
-                "complete() OK provider=%s model=%s tokens=%s",
+                "complete() OK provider=%s model=%s tokens=%s tool_calls=%d",
                 self.provider_code,
                 request.model_key,
                 usage.total_tokens if usage else "n/a",
+                len(tool_calls),
             )
 
             return LLMCompletionResult(
@@ -260,7 +405,8 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                     if isinstance(response_metadata, dict)
                     else None
                 ),
-                raw_response=response_metadata if isinstance(response_metadata, dict) else None,
+                raw_response=raw_response,
+                tool_calls=tool_calls,
             )
         except AppError:
             raise
@@ -276,19 +422,21 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
     async def stream(self, request: LLMRequest) -> AsyncGenerator[LLMStreamEvent, None]:
         """
-        _build_chat_model y _prepare_messages se ejecutan ANTES del try/except
-        para que errores de configuración (API key faltante, rol inválido) se propaguen
-        como excepciones normales y no como eventos ERROR del stream.
-        El try/except solo cubre la comunicación real con el proveedor.
+        _prepare_model y _prepare_messages se ejecutan ANTES del try/except
+        para que errores de configuración, roles inválidos o tool binding
+        se propaguen como excepciones normales y no como eventos ERROR del stream.
+
+        En esta fase 1, stream() no implementa tool calling completo.
         """
-        model = self._build_chat_model(request)
+        model = self._prepare_model(request)
         messages = self._prepare_messages(request)
 
         logger.debug(
-            "stream() START provider=%s model=%s mensajes=%d",
+            "stream() START provider=%s model=%s mensajes=%d tools=%d",
             self.provider_code,
             request.model_key,
             len(messages),
+            len(request.tools),
         )
 
         yield LLMStreamEvent(type=StreamEventType.START)

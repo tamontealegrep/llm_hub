@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     default_top_p: float = 1.0
     default_max_output_tokens: int = 2048
     default_timeout_seconds: int = 60
+    default_max_tool_iterations: int = 8
 
     model_config = SettingsConfigDict(
         env_file=".env",

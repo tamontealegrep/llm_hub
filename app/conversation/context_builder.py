@@ -36,8 +36,30 @@ class SimpleContextBuilder(ContextBuilder):
 
         for message in history:
             if message.role == ConversationRole.USER:
-                messages.append(NormalizedMessage(role="user", content=message.content))
+                messages.append(
+                    NormalizedMessage(
+                        role="user",
+                        content=message.content,
+                    )
+                )
+
             elif message.role == ConversationRole.ASSISTANT:
-                messages.append(NormalizedMessage(role="assistant", content=message.content))
+                messages.append(
+                    NormalizedMessage(
+                        role="assistant",
+                        content=message.content,
+                        tool_calls=list(message.tool_calls),
+                    )
+                )
+
+            elif message.role == ConversationRole.TOOL:
+                messages.append(
+                    NormalizedMessage(
+                        role="tool",
+                        content=message.content,
+                        tool_call_id=message.tool_call_id,
+                        name=message.name,
+                    )
+                )
 
         return messages
