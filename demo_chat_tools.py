@@ -13,6 +13,42 @@ def _parse_tool_names(raw: str) -> list[str]:
     return [part.strip() for part in raw.replace(",", " ").split() if part.strip()]
 
 
+def _print_history(session) -> None:
+    print("\n--- HISTORIAL ---")
+    print(f"Provider actual: {session.current_provider_code}")
+    print(f"Modelo actual: {session.current_model_key}")
+
+    for msg in session.messages:
+        suffix = ""
+        if msg.provider_code and msg.model_key:
+            suffix = f" [{msg.provider_code}:{msg.model_key}]"
+
+        if msg.role.value == "assistant":
+            content = msg.content if msg.content else "(sin contenido textual)"
+            print(f"ASSISTANT: {content}{suffix}")
+
+            if msg.tool_calls:
+                for tool_call in msg.tool_calls:
+                    print(
+                        "    -> TOOL_CALL "
+                        f"id={tool_call.id} "
+                        f"name={tool_call.name} "
+                        f"args={_json_dump(tool_call.arguments)}"
+                    )
+
+        elif msg.role.value == "tool":
+            tool_label = msg.name or "(sin nombre)"
+            print(
+                f"TOOL: {msg.content} "
+                f"[tool_call_id={msg.tool_call_id}, name={tool_label}]"
+            )
+
+        else:
+            print(f"{msg.role.value.upper()}: {msg.content}{suffix}")
+
+    print("-----------------\n")
+
+
 def _print_tools_status(
     *,
     available_tool_names: list[str],
@@ -42,8 +78,8 @@ async def main() -> None:
         model_key=model_key,
         system_prompt=(
             "Eres un asistente técnico, claro, preciso y útil. "
-            "Cuando una herramienta disponible te permita responder mejor o con "
-            "datos más precisos, úsala. Si no hace falta, responde normalmente. "
+            "Cuando una herramienta disponible te permita responder mejor o con datos "
+            "más precisos, úsala. Si no hace falta, responde normalmente. "
             "Después de usar una herramienta, integra el resultado en una respuesta final."
         ),
     )
@@ -58,13 +94,12 @@ async def main() -> None:
     print(
         f"Tools disponibles: {', '.join(available_tool_names) if available_tool_names else '(ninguna)'}"
     )
+    print(
+        f"Tools activas al inicio: {', '.join(enabled_tool_names) if enabled_tool_names else '(ninguna)'}"
+    )
     print()
-
-    print("Ejemplos para probar tools builtin:")
-    print("  - ¿Qué hora UTC es ahora?")
-    print("  - Suma 12, 30 y 5")
+    print("Nota: este demo usa tool calling solo en modo no streaming.")
     print()
-
     print("Comandos:")
     print("  /switch <provider_code> <model_key>   -> cambia de proveedor y modelo")
     print("  /model <model_key>                    -> cambia solo el modelo actual")
@@ -87,39 +122,7 @@ async def main() -> None:
 
         if user_input == "/history":
             session = await service.get_conversation(conversation.id)
-            print("\n--- HISTORIAL ---")
-            print(f"Provider actual: {session.current_provider_code}")
-            print(f"Modelo actual: {session.current_model_key}")
-
-            for msg in session.messages:
-                suffix = ""
-                if msg.provider_code and msg.model_key:
-                    suffix = f" [{msg.provider_code}:{msg.model_key}]"
-
-                if msg.role.value == "assistant":
-                    content = msg.content if msg.content else "(sin contenido textual)"
-                    print(f"{msg.role.value.upper()}: {content}{suffix}")
-
-                    if msg.tool_calls:
-                        for tool_call in msg.tool_calls:
-                            print(
-                                "    -> TOOL_CALL "
-                                f"id={tool_call.id} "
-                                f"name={tool_call.name} "
-                                f"args={_json_dump(tool_call.arguments)}"
-                            )
-
-                elif msg.role.value == "tool":
-                    tool_label = msg.name or "(sin nombre)"
-                    print(
-                        f"{msg.role.value.upper()}: {msg.content} "
-                        f"[tool_call_id={msg.tool_call_id}, name={tool_label}]"
-                    )
-
-                else:
-                    print(f"{msg.role.value.upper()}: {msg.content}{suffix}")
-
-            print("-----------------\n")
+            _print_history(session)
             continue
 
         if user_input == "/tools list":
@@ -155,10 +158,7 @@ async def main() -> None:
                 if not tool_registry.has(tool_name)
             ]
             if invalid_tool_names:
-                print(
-                    "Tools no disponibles: "
-                    f"{', '.join(invalid_tool_names)}\n"
-                )
+                print(f"Tools no disponibles: {', '.join(invalid_tool_names)}\n")
                 continue
 
             deduped: list[str] = []
@@ -224,7 +224,8 @@ async def main() -> None:
                 user_text=user_input,
                 tool_names=enabled_tool_names,
             )
-            print(f"Asistente: {result.content}\n")
+            assistant_text = result.content if result.content else "(sin contenido textual)"
+            print(f"Asistente: {assistant_text}\n")
 
         except AppError as exc:
             print(f"[ERROR] {exc.error_code}: {exc.message}\n")
