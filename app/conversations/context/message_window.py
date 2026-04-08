@@ -1,6 +1,6 @@
 from app.conversations.interfaces import ContextBuilder
 from app.conversations.entities import ConversationRole, ConversationSession
-from app.capabilities.chat.contracts import NormalizedMessage
+from app.capabilities.chat.contracts import ChatMessage
 
 
 class SimpleContextBuilder(ContextBuilder):
@@ -19,12 +19,12 @@ class SimpleContextBuilder(ContextBuilder):
     def __init__(self, max_messages: int | None = None) -> None:
         self._max_messages = max_messages
 
-    def build(self, session: ConversationSession) -> list[NormalizedMessage]:
-        messages: list[NormalizedMessage] = []
+    def build(self, session: ConversationSession) -> list[ChatMessage]:
+        messages: list[ChatMessage] = []
 
         if session.system_prompt:
             messages.append(
-                NormalizedMessage(
+                ChatMessage(
                     role="system",
                     content=session.system_prompt,
                 )
@@ -37,7 +37,7 @@ class SimpleContextBuilder(ContextBuilder):
         for message in history:
             if message.role == ConversationRole.USER:
                 messages.append(
-                    NormalizedMessage(
+                    ChatMessage(
                         role="user",
                         content=message.content,
                     )
@@ -45,7 +45,7 @@ class SimpleContextBuilder(ContextBuilder):
 
             elif message.role == ConversationRole.ASSISTANT:
                 messages.append(
-                    NormalizedMessage(
+                    ChatMessage(
                         role="assistant",
                         content=message.content,
                         tool_calls=list(message.tool_calls),
@@ -54,7 +54,7 @@ class SimpleContextBuilder(ContextBuilder):
 
             elif message.role == ConversationRole.TOOL:
                 messages.append(
-                    NormalizedMessage(
+                    ChatMessage(
                         role="tool",
                         content=message.content,
                         tool_call_id=message.tool_call_id,

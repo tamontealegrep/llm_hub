@@ -1,5 +1,5 @@
 from app.runtime.providers.langchain.chat.base import BaseProviderAdapter
-from app.capabilities.chat.contracts import LLMRequest
+from app.capabilities.chat.contracts import ChatRequest
 
 
 class GeminiAdapter(BaseProviderAdapter):
@@ -18,5 +18,5 @@ class GeminiAdapter(BaseProviderAdapter):
 
     provider_code = "google"
 
-    def _build_chat_model(self, request: LLMRequest):
+    def _build_chat_model(self, request: ChatRequest):
         return self._factory.build_gemini(request.model_key, request.config)

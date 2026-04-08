@@ -2,7 +2,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.shared.settings.env import EnvSettings
 from app.shared.exceptions import ProviderConfigurationError
-from app.capabilities.chat.contracts import LLMRequestConfig
+from app.capabilities.chat.contracts import ChatRequestConfig
 
 
 class LangChainChatModelFactory:
@@ -15,7 +15,7 @@ class LangChainChatModelFactory:
     def __init__(self, settings: EnvSettings) -> None:
         self._settings = settings
 
-    def build_openai(self, model_key: str, config: LLMRequestConfig) -> BaseChatModel:
+    def build_openai(self, model_key: str, config: ChatRequestConfig) -> BaseChatModel:
         if not self._settings.openai_api_key:
             raise ProviderConfigurationError("OPENAI_API_KEY no está configurada")
 
@@ -34,7 +34,7 @@ class LangChainChatModelFactory:
             max_retries=2,
         )
 
-    def build_anthropic(self, model_key: str, config: LLMRequestConfig) -> BaseChatModel:
+    def build_anthropic(self, model_key: str, config: ChatRequestConfig) -> BaseChatModel:
         if not self._settings.anthropic_api_key:
             raise ProviderConfigurationError("ANTHROPIC_API_KEY no está configurada")
 
@@ -51,7 +51,7 @@ class LangChainChatModelFactory:
             timeout=config.timeout_seconds,
         )
 
-    def build_gemini(self, model_key: str, config: LLMRequestConfig) -> BaseChatModel:
+    def build_gemini(self, model_key: str, config: ChatRequestConfig) -> BaseChatModel:
         if not self._settings.google_api_key:
             raise ProviderConfigurationError("GOOGLE_API_KEY no está configurada")
 
@@ -69,7 +69,7 @@ class LangChainChatModelFactory:
             convert_system_message_to_human=False,
         )
 
-    def build_xai(self, model_key: str, config: LLMRequestConfig) -> BaseChatModel:
+    def build_xai(self, model_key: str, config: ChatRequestConfig) -> BaseChatModel:
         """
         xAI (Grok) utiliza la librería oficial langchain-xai para interactuar
         de forma nativa con sus modelos.

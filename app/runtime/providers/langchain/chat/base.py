@@ -19,10 +19,10 @@ from app.shared.exceptions import (
 )
 from app.capabilities.common.models import TokenUsage
 from app.capabilities.chat.contracts import (
-    LLMCompletionResult,
-    LLMRequest,
-    LLMStreamEvent,
-    StreamEventType,
+    ChatCompletionResult,
+    ChatRequest,
+    ChatStreamEvent,
+    ChatStreamEventType,
 )
 from app.runtime.providers.langchain.factory import LangChainChatModelFactory
 from app.runtime.providers.base import LLMProviderAdapter
@@ -43,14 +43,14 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     # ------------------------------------------------------------------
 
     @abstractmethod
-    def _build_chat_model(self, request: LLMRequest) -> BaseChatModel:
+    def _build_chat_model(self, request: ChatRequest) -> BaseChatModel:
         raise NotImplementedError
 
     # ------------------------------------------------------------------
     # Preparación del modelo y los mensajes
     # ------------------------------------------------------------------
 
-    def _prepare_model(self, request: LLMRequest) -> Any:
+    def _prepare_model(self, request: ChatRequest) -> Any:
         model = self._build_chat_model(request)
 
         if not request.tools:
@@ -78,7 +78,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 f"El proveedor '{self.provider_code}' no soporta tool calling"
             ) from exc
 
-    def _prepare_messages(self, request: LLMRequest) -> list:
+    def _prepare_messages(self, request: ChatRequest) -> list:
         return self._to_langchain_messages(request.messages)
 
     # ------------------------------------------------------------------
@@ -118,7 +118,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
 
     def _to_langchain_messages(self, messages: list) -> list:
         """
-        Convierte NormalizedMessage a mensajes LangChain.
+        Convierte ChatMessage a mensajes LangChain.
         Soporta roles: system, user, assistant (con o sin tool_calls), tool.
         """
         converted = []
@@ -152,7 +152,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
             elif message.role == "tool":
                 if not message.tool_call_id:
                     raise ValueError(
-                        "NormalizedMessage con role='tool' requiere tool_call_id. "
+                        "ChatMessage con role='tool' requiere tool_call_id. "
                         f"Contenido: {message.content!r}"
                     )
                 converted.append(
@@ -479,7 +479,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     # complete() — invocación sin streaming
     # ------------------------------------------------------------------
 
-    async def complete(self, request: LLMRequest) -> LLMCompletionResult:
+    async def complete(self, request: ChatRequest) -> ChatCompletionResult:
         model = self._prepare_model(request)
         messages = self._prepare_messages(request)
 
@@ -515,7 +515,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 len(tool_calls),
             )
 
-            return LLMCompletionResult(
+            return ChatCompletionResult(
                 content=self._extract_text(getattr(response, "content", None)),
                 finish_reason=(
                     response_metadata.get("finish_reason")
@@ -547,7 +547,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     # stream() — streaming con soporte completo de tool calling
     # ------------------------------------------------------------------
 
-    async def stream(self, request: LLMRequest) -> AsyncGenerator[LLMStreamEvent, None]:
+    async def stream(self, request: ChatRequest) -> AsyncGenerator[ChatStreamEvent, None]:
         """
         Streaming con soporte completo de tool calling.
 
@@ -576,7 +576,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
             len(request.tools),
         )
 
-        yield LLMStreamEvent(type=StreamEventType.START)
+        yield ChatStreamEvent(type=ChatStreamEventType.START)
 
         # Dict para acumular los tool_call_chunks fragmentados.
         # Clave: índice del tool_call (int)
@@ -591,7 +591,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 # 2. Emitir delta de texto si existe
                 delta = self._extract_text(getattr(chunk, "content", None))
                 if delta:
-                    yield LLMStreamEvent(type=StreamEventType.DELTA, delta=delta)
+                    yield ChatStreamEvent(type=ChatStreamEventType.DELTA, delta=delta)
 
             # ---- Fin del stream crudo del provider ----
 
@@ -606,8 +606,8 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                         request.model_key,
                         len(tool_calls),
                     )
-                    yield LLMStreamEvent(
-                        type=StreamEventType.TOOL_USE,
+                    yield ChatStreamEvent(
+                        type=ChatStreamEventType.TOOL_USE,
                         tool_calls=tool_calls,
                     )
                 else:
@@ -624,7 +624,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 self.provider_code,
                 request.model_key,
             )
-            yield LLMStreamEvent(type=StreamEventType.END)
+            yield ChatStreamEvent(type=ChatStreamEventType.END)
 
         except AppError as exc:
             logger.error(
@@ -633,8 +633,8 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 request.model_key,
                 exc.error_code,
             )
-            yield LLMStreamEvent(
-                type=StreamEventType.ERROR,
+            yield ChatStreamEvent(
+                type=ChatStreamEventType.ERROR,
                 error_code=exc.error_code,
                 error_message=exc.message,
             )
@@ -647,8 +647,8 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
                 exc.__class__.__name__,
                 exc,
             )
-            yield LLMStreamEvent(
-                type=StreamEventType.ERROR,
+            yield ChatStreamEvent(
+                type=ChatStreamEventType.ERROR,
                 error_code=getattr(normalized, "error_code", "provider_error"),
                 error_message=str(normalized),
             )

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from app.conversations.context.message_window import SimpleContextBuilder
 from app.conversations.repository import InMemoryConversationRepository
 from app.capabilities.chat.service import ConversationService
-from app.capabilities.chat.contracts import LLMRequestConfig
+from app.capabilities.chat.contracts import ChatRequestConfig
 from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicAdapter
 from app.runtime.providers.langchain.chat.gemini_adapter import GeminiAdapter
 from app.runtime.providers.langchain.chat.grok_adapter import GrokAdapter
@@ -69,7 +69,7 @@ def build_container(
     *,
     settings: EnvSettings | None = None,
     max_context_messages: int | None = None,
-    default_config: LLMRequestConfig | None = None,
+    default_config: ChatRequestConfig | None = None,
     with_builtin_tools: bool = False,
     with_custom_tools: bool = True,              # ← NUEVO (activo por defecto)
 ) -> AppContainer:
@@ -96,7 +96,7 @@ def build_container(
 
     resolved_default_config = default_config
     if resolved_default_config is None:
-        resolved_default_config = LLMRequestConfig(
+        resolved_default_config = ChatRequestConfig(
             temperature=resolved_settings.default_temperature,
             top_p=resolved_settings.default_top_p,
             max_output_tokens=resolved_settings.default_max_output_tokens,

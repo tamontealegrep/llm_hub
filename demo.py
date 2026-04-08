@@ -27,7 +27,7 @@ import textwrap
 
 from app.bootstrap import build_container, pick_default_provider_and_model
 from app.shared.exceptions import AppError
-from app.capabilities.chat.contracts import StreamEventType
+from app.capabilities.chat.contracts import ChatStreamEventType
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Colores ANSI (se deshabilitan si stdout no es terminal)
@@ -249,7 +249,7 @@ async def _handle_streaming(
 
     async for event in stream:
 
-        if event.type == StreamEventType.START:
+        if event.type == ChatStreamEventType.START:
             if not in_assistant_turn:
                 print(f"\n{bold(green('Asistente:'))} ", end="", flush=True)
                 in_assistant_turn = True
@@ -258,11 +258,11 @@ async def _handle_streaming(
                 tool_iteration += 1
                 print(f"\n{bold(green('Asistente:'))} {dim(f'(tras tools, iter {tool_iteration})')}", end=" ", flush=True)
 
-        elif event.type == StreamEventType.DELTA:
+        elif event.type == ChatStreamEventType.DELTA:
             if event.delta:
                 print(event.delta, end="", flush=True)
 
-        elif event.type == StreamEventType.TOOL_USE:
+        elif event.type == ChatStreamEventType.TOOL_USE:
             # El servicio ya ejecutó las tools; aquí solo mostramos el resumen
             print()  # nueva línea tras el texto que hubiera
             calls = event.tool_calls
@@ -284,10 +284,10 @@ async def _handle_streaming(
             print(dim(f"  └{'─' * 48}"))
             in_assistant_turn = False  # el próximo START es un nuevo turno
 
-        elif event.type == StreamEventType.END:
+        elif event.type == ChatStreamEventType.END:
             print("\n")  # línea limpia al terminar
 
-        elif event.type == StreamEventType.ERROR:
+        elif event.type == ChatStreamEventType.ERROR:
             print(f"\n{red(f'[ERROR] {event.error_code}: {event.error_message}')}\n")
             return
 

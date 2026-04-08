@@ -9,11 +9,11 @@ from app.shared.exceptions import (
     ToolLoopLimitExceededError,
 )
 from app.capabilities.chat.contracts import (
-    LLMCompletionResult,
-    LLMRequest,
-    LLMRequestConfig,
-    LLMStreamEvent,
-    StreamEventType,
+    ChatCompletionResult,
+    ChatRequest,
+    ChatRequestConfig,
+    ChatStreamEvent,
+    ChatStreamEventType,
 )
 from app.runtime.execution.chat_executor import LLMOrchestrator
 from app.runtime.providers.registry import ProviderRegistry
@@ -33,7 +33,7 @@ class ConversationService:
         provider_registry: ProviderRegistry,
         tool_registry: ToolRegistry | None = None,
         tool_executor: ToolExecutor | None = None,
-        default_config: LLMRequestConfig | None = None,
+        default_config: ChatRequestConfig | None = None,
         max_tool_iterations: int = 8,
     ) -> None:
         resolved_tool_registry = tool_registry or ToolRegistry()
@@ -45,7 +45,7 @@ class ConversationService:
         self._provider_registry = provider_registry
         self._tool_registry = resolved_tool_registry
         self._tool_executor = resolved_tool_executor
-        self._default_config = default_config or LLMRequestConfig()
+        self._default_config = default_config or ChatRequestConfig()
         self._max_tool_iterations = max_tool_iterations
 
     # ------------------------------------------------------------------
@@ -108,7 +108,7 @@ class ConversationService:
         provider_code: str | None = None,
         model_key: str | None = None,
         tool_names: list[str] | None = None,
-    ) -> LLMCompletionResult:
+    ) -> ChatCompletionResult:
         """
         Envía un mensaje y espera la respuesta completa.
 
@@ -169,7 +169,7 @@ class ConversationService:
         provider_code: str | None = None,
         model_key: str | None = None,
         tool_names: list[str] | None = None,
-    ) -> AsyncGenerator[LLMStreamEvent, None]:
+    ) -> AsyncGenerator[ChatStreamEvent, None]:
         """
         Envía un mensaje en modo streaming con tool calling completo.
 
@@ -216,7 +216,7 @@ class ConversationService:
         *,
         session: ConversationSession,
         tool_definitions: list[ToolDefinition],
-    ) -> AsyncGenerator[LLMStreamEvent, None]:
+    ) -> AsyncGenerator[ChatStreamEvent, None]:
         """
         Generador que maneja el loop completo de streaming + tool calling.
 
@@ -242,17 +242,17 @@ class ConversationService:
 
             async for event in self._orchestrator.stream(request):
 
-                if event.type == StreamEventType.START:
+                if event.type == ChatStreamEventType.START:
                     # Propagar siempre para que el consumidor sepa que
                     # hay un nuevo turno del asistente (útil en UIs).
                     yield event
 
-                elif event.type == StreamEventType.DELTA:
+                elif event.type == ChatStreamEventType.DELTA:
                     if event.delta:
                         accumulated_text.append(event.delta)
                     yield event
 
-                elif event.type == StreamEventType.TOOL_USE:
+                elif event.type == ChatStreamEventType.TOOL_USE:
                     # El modelo solicitó tools. Guardar los tool_calls
                     # para procesarlos al finalizar el turno.
                     tool_calls_this_turn = event.tool_calls
@@ -261,7 +261,7 @@ class ConversationService:
                     # en su lugar emitiremos un TOOL_NOTIFY más informativo
                     # una vez que hayamos ejecutado las tools.
 
-                elif event.type == StreamEventType.END:
+                elif event.type == ChatStreamEventType.END:
                     final_text = "".join(accumulated_text)
 
                     if got_tool_use and tool_calls_this_turn:
@@ -277,8 +277,8 @@ class ConversationService:
 
                         # 2. Verificar límite de iteraciones
                         if iteration >= self._max_tool_iterations:
-                            yield LLMStreamEvent(
-                                type=StreamEventType.ERROR,
+                            yield ChatStreamEvent(
+                                type=ChatStreamEventType.ERROR,
                                 error_code="tool_loop_limit_exceeded",
                                 error_message=(
                                     f"Se alcanzó el máximo de iteraciones de "
@@ -312,8 +312,8 @@ class ConversationService:
                         await self._repository.save(session)
 
                         # 4. Notificar al consumidor sobre las tools ejecutadas
-                        yield LLMStreamEvent(
-                            type=StreamEventType.TOOL_USE,
+                        yield ChatStreamEvent(
+                            type=ChatStreamEventType.TOOL_USE,
                             tool_calls=tool_calls_this_turn,
                             raw_event={"executed_tools": executed_tools},
                         )
@@ -332,10 +332,10 @@ class ConversationService:
                             )
                             await self._repository.save(session)
 
-                        yield LLMStreamEvent(type=StreamEventType.END)
+                        yield ChatStreamEvent(type=ChatStreamEventType.END)
                         return
 
-                elif event.type == StreamEventType.ERROR:
+                elif event.type == ChatStreamEventType.ERROR:
                     got_error = True
                     yield event
                     return
@@ -352,7 +352,7 @@ class ConversationService:
                         model_key=session.current_model_key,
                     )
                     await self._repository.save(session)
-                yield LLMStreamEvent(type=StreamEventType.END)
+                yield ChatStreamEvent(type=ChatStreamEventType.END)
                 return
 
         # Agotamos las iteraciones sin llegar a un END limpio
@@ -423,14 +423,14 @@ class ConversationService:
         *,
         session: ConversationSession,
         tool_definitions: list[ToolDefinition] | None = None,
-    ) -> LLMRequest:
+    ) -> ChatRequest:
         resolved_tools = list(tool_definitions or [])
 
         metadata: dict[str, Any] = {"conversation_id": str(session.id)}
         if resolved_tools:
             metadata["tool_names"] = [t.name for t in resolved_tools]
 
-        return LLMRequest(
+        return ChatRequest(
             provider_code=session.current_provider_code,
             model_key=session.current_model_key,
             messages=self._context_builder.build(session),

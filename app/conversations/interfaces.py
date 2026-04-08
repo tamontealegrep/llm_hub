@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from uuid import UUID
 
 from app.conversations.entities import ConversationSession
-from app.capabilities.chat.contracts import NormalizedMessage
+from app.capabilities.chat.contracts import ChatMessage
 
 
 class ConversationRepository(ABC):
@@ -36,4 +36,4 @@ class ContextBuilder(ABC):
     """
 
     @abstractmethod
-    def build(self, session: ConversationSession) -> list[NormalizedMessage]: ...
+    def build(self, session: ConversationSession) -> list[ChatMessage]: ...

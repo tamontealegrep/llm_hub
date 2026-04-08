@@ -7,7 +7,7 @@ from app.capabilities.common.models import TokenUsage
  
  
 @dataclass(frozen=True, slots=True)
-class NormalizedMessage:
+class ChatMessage:
     """
     Mensaje normalizado que representa un turno en la conversación.
  
@@ -30,7 +30,7 @@ class NormalizedMessage:
     def __post_init__(self) -> None:
         if self.role == "tool" and not self.tool_call_id:
             raise ValueError(
-                "NormalizedMessage con role='tool' requiere tool_call_id. "
+                "ChatMessage con role='tool' requiere tool_call_id. "
                 f"Contenido recibido: {self.content!r}"
             )
  
@@ -51,7 +51,7 @@ class NormalizedMessage:
  
  
 @dataclass(frozen=True, slots=True)
-class LLMRequestConfig:
+class ChatRequestConfig:
     temperature: float = 0.2
     top_p: float = 1.0
     max_output_tokens: int = 2048
@@ -59,18 +59,18 @@ class LLMRequestConfig:
  
  
 @dataclass(frozen=True, slots=True)
-class LLMRequest:
+class ChatRequest:
     provider_code: str
     model_key: str
-    messages: list[NormalizedMessage]
-    config: LLMRequestConfig
+    messages: list[ChatMessage]
+    config: ChatRequestConfig
     metadata: dict[str, Any] = field(default_factory=dict)
     tools: list[ToolDefinition] = field(default_factory=list)
     tool_choice: str | dict[str, Any] | None = None
  
  
 @dataclass(frozen=True, slots=True)
-class LLMCompletionResult:
+class ChatCompletionResult:
     content: str
     finish_reason: str | None = None
     usage: TokenUsage | None = None
@@ -83,7 +83,7 @@ class LLMCompletionResult:
             raise ValueError("tool_calls debe contener instancias de ToolCall")
  
  
-class StreamEventType(str, Enum):
+class ChatStreamEventType(str, Enum):
     START = "start"
     DELTA = "delta"
     TOOL_USE = "tool_use"
@@ -92,8 +92,8 @@ class StreamEventType(str, Enum):
  
  
 @dataclass(slots=True)
-class LLMStreamEvent:
-    type: StreamEventType
+class ChatStreamEvent:
+    type: ChatStreamEventType
     delta: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
     usage: TokenUsage | None = None
