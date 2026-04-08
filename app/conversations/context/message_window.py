@@ -3,7 +3,7 @@ from app.conversations.entities import ConversationRole, ConversationSession
 from app.capabilities.chat.contracts import ChatMessage
 
 
-class SimpleContextBuilder(ConversationContextBuilder):
+class MessageWindowContextBuilder(ConversationContextBuilder):
     """
     Implementación de ConversationContextBuilder.
 

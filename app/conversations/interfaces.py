@@ -31,7 +31,7 @@ class ConversationRepository(ABC):
 class ConversationContextBuilder(ABC):
     """
     Contrato abstracto para la construcción del contexto que se envía al modelo.
-    Permite intercambiar SimpleContextBuilder por versiones con trimming por tokens,
+    Permite intercambiar MessageWindowContextBuilder por versiones con trimming por tokens,
     resumen automático, etc.
     """
 

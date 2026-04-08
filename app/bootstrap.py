@@ -1,7 +1,7 @@
 # app/bootstrap.py
 from dataclasses import dataclass
 
-from app.conversations.context.message_window import SimpleContextBuilder
+from app.conversations.context.message_window import MessageWindowContextBuilder
 from app.conversations.repository import InMemoryConversationRepository
 from app.capabilities.chat.service import ConversationService
 from app.capabilities.chat.contracts import ChatRequestConfig
@@ -104,7 +104,7 @@ def build_container(
         )
 
     repository = InMemoryConversationRepository()
-    context_builder = SimpleContextBuilder(max_messages=max_context_messages)
+    context_builder = MessageWindowContextBuilder(max_messages=max_context_messages)
     orchestrator = LLMOrchestrator(registry)
 
     tool_registry = ToolRegistry()
