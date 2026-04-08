@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 from abc import ABC, abstractmethod
@@ -84,13 +85,34 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
     # Conversión de esquemas y mensajes
     # ------------------------------------------------------------------
 
+    def _clean_schema_for_gemini(self, schema: Any) -> None:
+        """
+        Elimina recursivamente 'additionalProperties' del esquema, ya que Gemini
+        no lo soporta y lanza advertencias o errores.
+        """
+        if isinstance(schema, dict):
+            schema.pop("additionalProperties", None)
+            for value in schema.values():
+                self._clean_schema_for_gemini(value)
+        elif isinstance(schema, list):
+            for item in schema:
+                self._clean_schema_for_gemini(item)
+
     def _to_langchain_tool_schema(self, tool: ToolDefinition) -> dict[str, Any]:
+        parameters = copy.deepcopy(tool.input_schema)
+
+        if self.provider_code == "google":
+            self._clean_schema_for_gemini(parameters)
+
+        if "type" not in parameters:
+            parameters["type"] = "object"
+
         return {
             "type": "function",
             "function": {
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": tool.input_schema,
+                "parameters": parameters,
             },
         }
 
