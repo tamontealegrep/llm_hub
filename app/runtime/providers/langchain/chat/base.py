@@ -558,7 +558,7 @@ class BaseProviderAdapter(LLMProviderAdapter, ABC):
           END    → fin del turno (siempre el último evento)
           ERROR  → error de proveedor (el stream se detiene)
 
-        El consumidor (ConversationService.stream_message) maneja el evento
+        El consumidor (ChatService.stream_message) maneja el evento
         TOOL_USE ejecutando las herramientas y relanzando el stream en un loop.
 
         Nota: _prepare_model y _prepare_messages se ejecutan ANTES del try/except

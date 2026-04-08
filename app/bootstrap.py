@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from app.conversations.context.message_window import MessageWindowContextBuilder
 from app.conversations.repository import InMemoryConversationRepository
-from app.capabilities.chat.service import ConversationService
+from app.capabilities.chat.service import ChatService
 from app.capabilities.chat.contracts import ChatRequestConfig
 from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicAdapter
 from app.runtime.providers.langchain.chat.gemini_adapter import GeminiAdapter
@@ -24,7 +24,7 @@ class AppContainer:
     settings: EnvSettings
     registry: ProviderRegistry
     tool_registry: ToolRegistry
-    service: ConversationService
+    service: ChatService
 
 
 def build_registry(settings: EnvSettings) -> ProviderRegistry:
@@ -120,7 +120,7 @@ def build_container(
 
     tool_executor = ToolExecutor(tool_registry)
 
-    service = ConversationService(
+    service = ChatService(
         repository=repository,
         context_builder=context_builder,
         orchestrator=orchestrator,

@@ -22,7 +22,7 @@ from app.tools.executor import ToolExecutor
 from app.tools.registry import ToolRegistry
 
 
-class ConversationService:
+class ChatService:
 
     def __init__(
         self,

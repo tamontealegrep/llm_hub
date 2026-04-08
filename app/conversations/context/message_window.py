@@ -13,7 +13,7 @@ class MessageWindowContextBuilder(ConversationContextBuilder):
     - opcionalmente recorta por cantidad de mensajes (sin trimming por tokens)
 
     Para trimming por tokens, implementar ConversationContextBuilder con tiktoken u otro
-    contador de tokens sin modificar ConversationService.
+    contador de tokens sin modificar ChatService.
     """
 
     def __init__(self, max_messages: int | None = None) -> None:
