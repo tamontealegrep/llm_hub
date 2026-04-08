@@ -1,6 +1,6 @@
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from app.shared.settings.env import Settings
+from app.shared.settings.env import EnvSettings
 from app.shared.exceptions import ProviderConfigurationError
 from app.capabilities.chat.contracts import LLMRequestConfig
 
@@ -12,7 +12,7 @@ class LangChainChatModelFactory:
     en adapters y habilitar el soporte del type checker.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: EnvSettings) -> None:
         self._settings = settings
 
     def build_openai(self, model_key: str, config: LLMRequestConfig) -> BaseChatModel:

@@ -12,7 +12,7 @@ from app.runtime.providers.langchain.chat.openai_adapter import OpenAIAdapter
 from app.runtime.providers.langchain.factory import LangChainChatModelFactory
 from app.runtime.providers.registry import ProviderRegistry
 from app.runtime.execution.chat_executor import LLMOrchestrator
-from app.shared.settings.env import Settings, get_settings
+from app.shared.settings.env import EnvSettings, get_env_settings
 from app.tools.builtin import register_builtin_tools
 from app.tools.executor import ToolExecutor
 from app.tools.loader import load_custom_tools
@@ -21,13 +21,13 @@ from app.tools.registry import ToolRegistry
 
 @dataclass(frozen=True, slots=True)
 class AppContainer:
-    settings: Settings
+    settings: EnvSettings
     registry: ProviderRegistry
     tool_registry: ToolRegistry
     service: ConversationService
 
 
-def build_registry(settings: Settings) -> ProviderRegistry:
+def build_registry(settings: EnvSettings) -> ProviderRegistry:
     factory = LangChainChatModelFactory(settings)
     registry = ProviderRegistry()
 
@@ -47,7 +47,7 @@ def build_registry(settings: Settings) -> ProviderRegistry:
 
 
 def pick_default_provider_and_model(
-    settings: Settings,
+    settings: EnvSettings,
     registry: ProviderRegistry,
 ) -> tuple[str, str]:
     if registry.has("openai"):
@@ -67,7 +67,7 @@ def pick_default_provider_and_model(
 
 def build_container(
     *,
-    settings: Settings | None = None,
+    settings: EnvSettings | None = None,
     max_context_messages: int | None = None,
     default_config: LLMRequestConfig | None = None,
     with_builtin_tools: bool = False,
@@ -86,7 +86,7 @@ def build_container(
             app/tools/custom/. Default: True.
             Pasa False en tests unitarios donde no quieras cargar tools externas.
     """
-    resolved_settings = settings or get_settings()
+    resolved_settings = settings or get_env_settings()
     registry = build_registry(resolved_settings)
 
     if not registry.available_provider_codes():
