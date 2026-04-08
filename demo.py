@@ -25,7 +25,7 @@ import json
 import sys
 import textwrap
 
-from app.bootstrap import build_container, pick_default_chat_provider_and_model
+from app.bootstrap import build_container
 from app.shared.exceptions import AppError
 from app.capabilities.chat.contracts import ChatStreamEventType
 
@@ -298,10 +298,10 @@ async def _handle_streaming(
 
 async def main(args: argparse.Namespace) -> None:
     container = build_container(with_builtin_tools=True)
-    settings  = container.settings
-    registry  = container.provider_registry
+    settings = container.settings
+    registry = container.provider_registry
     tool_registry = container.tool_registry
-    service   = container.chat_service
+    service = container.chat_service
 
     # Determinar provider y modelo iniciales
     if args.provider and args.model:
@@ -315,7 +315,8 @@ async def main(args: argparse.Namespace) -> None:
         print(red("[ERROR] Si especificas --provider debes también especificar --model."))
         sys.exit(1)
     else:
-        provider_code, model_key = pick_default_chat_provider_and_model(settings, registry)
+        provider_code = container.default_chat_provider_code
+        model_key = container.default_chat_model_key
 
     conversation = await service.create_conversation(
         provider_code=provider_code,

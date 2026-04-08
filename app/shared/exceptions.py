@@ -104,7 +104,10 @@ class InvalidProviderSelectionError(AppError):
 
 
 class ToolNotFoundError(AppError):
-    def __init__(self, tool_name: str) -> None:
+    def __init__(
+        self,
+        tool_name: str
+    ) -> None:
         super().__init__(
             f"Herramienta no encontrada: '{tool_name}'",
             error_code="tool_not_found",
@@ -113,9 +116,40 @@ class ToolNotFoundError(AppError):
 
 
 class ToolLoopLimitExceededError(AppError):
-    def __init__(self, max_iterations: int) -> None:
+    def __init__(
+        self,
+        max_iterations: int
+    ) -> None:
         super().__init__(
             f"Se alcanzó el máximo de iteraciones de tool calling ({max_iterations})",
             error_code="tool_loop_limit_exceeded",
             details={"max_iterations": max_iterations},
+        )
+
+
+class ConfigurationError(AppError):
+    def __init__(
+        self,
+        message: str = "Configuración inválida",
+        *,
+        details: dict | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            error_code="configuration_error",
+            details=details,
+        )
+
+
+class ModelCatalogError(AppError):
+    def __init__(
+        self,
+        message: str = "Error en el catálogo de modelos",
+        *,
+        details: dict | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            error_code="model_catalog_error",
+            details=details,
         )

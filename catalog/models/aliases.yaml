@@ -1,0 +1,20 @@
+aliases:
+  smart-chat:
+    provider_code: anthropic
+    model_key: claude-3-5-sonnet-latest
+    capability: chat
+
+  fast-chat:
+    provider_code: google
+    model_key: gemini-1.5-flash
+    capability: chat
+
+  cheap-chat:
+    provider_code: openai
+    model_key: gpt-4o-mini
+    capability: chat
+
+  default-image:
+    provider_code: openai
+    model_key: gpt-image-1
+    capability: image_generation

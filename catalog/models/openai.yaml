@@ -1,0 +1,134 @@
+provider_code: openai
+display_name: OpenAI
+default_chat_model: gpt-4o-mini
+
+models:
+  - key: gpt-4o-mini
+    display_name: GPT-4o Mini
+    description: Modelo generalista rápido y económico.
+    capabilities:
+      chat: true
+      image_generation: false
+      agents: true
+      embeddings: false
+      tools: true
+      streaming: true
+      structured_output: true
+      vision_input: true
+    defaults:
+      temperature: 0.2
+      top_p: 1.0
+      max_output_tokens: 2048
+      timeout_seconds: 60
+    supported_params:
+      temperature:
+        supported: true
+        default: 0.2
+        min: 0.0
+        max: 2.0
+      top_p:
+        supported: true
+        default: 1.0
+        min: 0.0
+        max: 1.0
+      max_output_tokens:
+        supported: true
+        default: 2048
+        min: 1
+      timeout_seconds:
+        supported: true
+        default: 60
+        min: 1
+      tools:
+        supported: true
+      tool_choice:
+        supported: true
+      stream:
+        supported: true
+    tags:
+      - chat
+      - economical
+      - vision
+
+  - key: gpt-4o
+    display_name: GPT-4o
+    description: Modelo generalista de mayor capacidad.
+    capabilities:
+      chat: true
+      image_generation: false
+      agents: true
+      embeddings: false
+      tools: true
+      streaming: true
+      structured_output: true
+      vision_input: true
+    defaults:
+      temperature: 0.2
+      top_p: 1.0
+      max_output_tokens: 4096
+      timeout_seconds: 60
+    supported_params:
+      temperature:
+        supported: true
+        default: 0.2
+        min: 0.0
+        max: 2.0
+      top_p:
+        supported: true
+        default: 1.0
+        min: 0.0
+        max: 1.0
+      max_output_tokens:
+        supported: true
+        default: 4096
+        min: 1
+      timeout_seconds:
+        supported: true
+        default: 60
+        min: 1
+      tools:
+        supported: true
+      tool_choice:
+        supported: true
+      stream:
+        supported: true
+    tags:
+      - chat
+      - premium
+      - vision
+
+  - key: gpt-image-1
+    display_name: GPT Image 1
+    description: Modelo habilitado para generación de imágenes.
+    capabilities:
+      chat: false
+      image_generation: true
+      agents: false
+      embeddings: false
+      tools: false
+      streaming: false
+      structured_output: false
+      vision_input: false
+    defaults:
+      timeout_seconds: 120
+    supported_params:
+      size:
+        supported: true
+        default: "1024x1024"
+        allowed_values:
+          - "1024x1024"
+          - "1536x1024"
+          - "1024x1536"
+      quality:
+        supported: true
+        default: "medium"
+        allowed_values:
+          - "low"
+          - "medium"
+          - "high"
+      timeout_seconds:
+        supported: true
+        default: 120
+        min: 1
+    tags:
+      - image-generation

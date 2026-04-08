@@ -1,0 +1,24 @@
+defaults:
+  temperature: 0.2
+  top_p: 1.0
+  max_output_tokens: 2048
+  timeout_seconds: 60
+  max_tool_iterations: 8
+
+features:
+  chat_enabled: true
+  image_generation_enabled: false
+  agents_enabled: false
+  embeddings_enabled: false
+
+paths:
+  model_catalog_dir: "catalog/models"
+  pricing_catalog_dir: "catalog/pricing"
+  prompts_catalog_dir: "catalog/prompts"
+
+routing:
+  default_chat_provider_priority:
+    - openai
+    - anthropic
+    - google
+    - xai

@@ -1,0 +1,3 @@
+features:
+  image_generation_enabled: false
+  agents_enabled: false
