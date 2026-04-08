@@ -25,7 +25,7 @@ import json
 import sys
 import textwrap
 
-from app.bootstrap import build_container, pick_default_provider_and_model
+from app.bootstrap import build_container, pick_default_chat_provider_and_model
 from app.shared.exceptions import AppError
 from app.capabilities.chat.contracts import ChatStreamEventType
 
@@ -315,7 +315,7 @@ async def main(args: argparse.Namespace) -> None:
         print(red("[ERROR] Si especificas --provider debes también especificar --model."))
         sys.exit(1)
     else:
-        provider_code, model_key = pick_default_provider_and_model(settings, registry)
+        provider_code, model_key = pick_default_chat_provider_and_model(settings, registry)
 
     conversation = await service.create_conversation(
         provider_code=provider_code,

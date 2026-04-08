@@ -27,7 +27,7 @@ class AppContainer:
     service: ChatService
 
 
-def build_registry(settings: EnvSettings) -> ProviderRegistry:
+def build_chat_provider_registry(settings: EnvSettings) -> ProviderRegistry:
     factory = LangChainProviderFactory(settings)
     registry = ProviderRegistry()
 
@@ -46,7 +46,7 @@ def build_registry(settings: EnvSettings) -> ProviderRegistry:
     return registry
 
 
-def pick_default_provider_and_model(
+def pick_default_chat_provider_and_model(
     settings: EnvSettings,
     registry: ProviderRegistry,
 ) -> tuple[str, str]:
@@ -69,7 +69,7 @@ def build_container(
     *,
     settings: EnvSettings | None = None,
     max_context_messages: int | None = None,
-    default_config: ChatRequestConfig | None = None,
+    default_chat_config: ChatRequestConfig | None = None,
     with_builtin_tools: bool = False,
     with_custom_tools: bool = True,              # ← NUEVO (activo por defecto)
 ) -> AppContainer:
@@ -87,16 +87,16 @@ def build_container(
             Pasa False en tests unitarios donde no quieras cargar tools externas.
     """
     resolved_settings = settings or get_env_settings()
-    registry = build_registry(resolved_settings)
+    provider_registry = build_chat_provider_registry(resolved_settings)
 
-    if not registry.available_provider_codes():
+    if not provider_registry.available_provider_codes():
         raise RuntimeError(
             "No hay proveedores configurados. Revisa tu .env y las API keys."
         )
 
-    resolved_default_config = default_config
-    if resolved_default_config is None:
-        resolved_default_config = ChatRequestConfig(
+    resolved_default_chat_config = default_chat_config
+    if resolved_default_chat_config is None:
+        resolved_default_chat_config = ChatRequestConfig(
             temperature=resolved_settings.default_temperature,
             top_p=resolved_settings.default_top_p,
             max_output_tokens=resolved_settings.default_max_output_tokens,
@@ -105,7 +105,7 @@ def build_container(
 
     repository = InMemoryConversationRepository()
     context_builder = MessageWindowContextBuilder(max_messages=max_context_messages)
-    orchestrator = ChatOrchestrator(registry)
+    chat_orchestrator = ChatOrchestrator(provider_registry)
 
     tool_registry = ToolRegistry()
 
@@ -120,20 +120,20 @@ def build_container(
 
     tool_executor = ToolExecutor(tool_registry)
 
-    service = ChatService(
+    chat_service = ChatService(
         repository=repository,
         context_builder=context_builder,
-        orchestrator=orchestrator,
-        provider_registry=registry,
+        orchestrator=chat_orchestrator,
+        provider_registry=provider_registry,
         tool_registry=tool_registry,
         tool_executor=tool_executor,
-        default_config=resolved_default_config,
+        default_config=resolved_default_chat_config,
         max_tool_iterations=resolved_settings.default_max_tool_iterations,
     )
 
     return AppContainer(
         settings=resolved_settings,
-        registry=registry,
+        registry=provider_registry,
         tool_registry=tool_registry,
-        service=service,
+        service=chat_service,
     )
