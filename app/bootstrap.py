@@ -22,9 +22,9 @@ from app.tools.registry import ToolRegistry
 @dataclass(frozen=True, slots=True)
 class AppContainer:
     settings: EnvSettings
-    registry: ProviderRegistry
+    provider_registry: ProviderRegistry
     tool_registry: ToolRegistry
-    service: ChatService
+    chat_service: ChatService
 
 
 def build_chat_provider_registry(settings: EnvSettings) -> ProviderRegistry:
@@ -133,7 +133,7 @@ def build_container(
 
     return AppContainer(
         settings=resolved_settings,
-        registry=provider_registry,
+        provider_registry=provider_registry,
         tool_registry=tool_registry,
-        service=chat_service,
+        chat_service=chat_service,
     )

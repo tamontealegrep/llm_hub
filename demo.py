@@ -299,9 +299,9 @@ async def _handle_streaming(
 async def main(args: argparse.Namespace) -> None:
     container = build_container(with_builtin_tools=True)
     settings  = container.settings
-    registry  = container.registry
+    registry  = container.provider_registry
     tool_registry = container.tool_registry
-    service   = container.service
+    service   = container.chat_service
 
     # Determinar provider y modelo iniciales
     if args.provider and args.model:
