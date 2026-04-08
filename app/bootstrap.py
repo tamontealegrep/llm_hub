@@ -14,7 +14,7 @@ from app.runtime.providers.langchain.chat.xai_adapter import XAIChatAdapter
 from app.runtime.providers.langchain.chat.openai_adapter import OpenAIChatAdapter
 from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.registry import ProviderRegistry
-from app.runtime.execution.chat_orchestator import ChatOrchestrator
+from app.runtime.execution.chat_orchestrator import ChatOrchestrator
 from app.shared.settings.loader import RuntimeSettings, get_settings
 from app.shared.settings.env import EnvSettings
 from app.tools.builtin import register_builtin_tools

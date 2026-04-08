@@ -15,7 +15,7 @@ from app.capabilities.chat.contracts import (
     ChatStreamEvent,
     ChatStreamEventType,
 )
-from app.runtime.execution.chat_orchestator import ChatOrchestrator
+from app.runtime.execution.chat_orchestrator import ChatOrchestrator
 from app.runtime.providers.registry import ProviderRegistry
 from app.tools.contracts import ToolDefinition, ToolExecutionContext
 from app.tools.executor import ToolExecutor
