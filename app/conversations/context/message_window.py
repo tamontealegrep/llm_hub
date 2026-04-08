@@ -1,6 +1,6 @@
-from app.conversation.interfaces import ContextBuilder
-from app.conversation.models import ConversationRole, ConversationSession
-from app.llm.contracts import NormalizedMessage
+from app.conversations.interfaces import ContextBuilder
+from app.conversations.entities import ConversationRole, ConversationSession
+from app.capabilities.chat.contracts import NormalizedMessage
 
 
 class SimpleContextBuilder(ContextBuilder):

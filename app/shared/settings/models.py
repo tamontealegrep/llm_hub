@@ -1,0 +1,1 @@
+# Configuración tipada cargada desde YAML

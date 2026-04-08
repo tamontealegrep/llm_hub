@@ -3,7 +3,7 @@ import json
 import logging
 from typing import Any
 
-from app.core.exceptions import ToolNotFoundError
+from app.shared.exceptions import ToolNotFoundError
 from app.tools.contracts import ToolCall, ToolExecutionContext, ToolExecutionResult
 from app.tools.registry import ToolRegistry
 

@@ -2,21 +2,21 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from uuid import UUID
 
-from app.conversation.interfaces import ContextBuilder, ConversationRepository
-from app.conversation.models import ConversationSession
-from app.core.exceptions import (
+from app.conversations.interfaces import ContextBuilder, ConversationRepository
+from app.conversations.entities import ConversationSession
+from app.shared.exceptions import (
     InvalidProviderSelectionError,
     ToolLoopLimitExceededError,
 )
-from app.llm.contracts import (
+from app.capabilities.chat.contracts import (
     LLMCompletionResult,
     LLMRequest,
     LLMRequestConfig,
     LLMStreamEvent,
     StreamEventType,
 )
-from app.llm.orchestrator import LLMOrchestrator
-from app.llm.registry import ProviderRegistry
+from app.runtime.execution.chat_executor import LLMOrchestrator
+from app.runtime.providers.registry import ProviderRegistry
 from app.tools.contracts import ToolDefinition, ToolExecutionContext
 from app.tools.executor import ToolExecutor
 from app.tools.registry import ToolRegistry

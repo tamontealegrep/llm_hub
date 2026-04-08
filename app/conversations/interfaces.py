@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from uuid import UUID
 
-from app.conversation.models import ConversationSession
-from app.llm.contracts import NormalizedMessage
+from app.conversations.entities import ConversationSession
+from app.capabilities.chat.contracts import NormalizedMessage
 
 
 class ConversationRepository(ABC):

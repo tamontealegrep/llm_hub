@@ -1,21 +1,21 @@
 # app/bootstrap.py
 from dataclasses import dataclass
 
-from app.conversation.context_builder import SimpleContextBuilder
-from app.conversation.repository import InMemoryConversationRepository
-from app.conversation.service import ConversationService
-from app.core.config import Settings, get_settings
-from app.llm.adapters.anthropic_adapter import AnthropicAdapter
-from app.llm.adapters.gemini_adapter import GeminiAdapter
-from app.llm.adapters.grok_adapter import GrokAdapter
-from app.llm.adapters.openai_adapter import OpenAIAdapter
-from app.llm.contracts import LLMRequestConfig
-from app.llm.factory import LangChainChatModelFactory
-from app.llm.orchestrator import LLMOrchestrator
-from app.llm.registry import ProviderRegistry
+from app.conversations.context.message_window import SimpleContextBuilder
+from app.conversations.repository import InMemoryConversationRepository
+from app.capabilities.chat.service import ConversationService
+from app.capabilities.chat.contracts import LLMRequestConfig
+from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicAdapter
+from app.runtime.providers.langchain.chat.gemini_adapter import GeminiAdapter
+from app.runtime.providers.langchain.chat.grok_adapter import GrokAdapter
+from app.runtime.providers.langchain.chat.openai_adapter import OpenAIAdapter
+from app.runtime.providers.langchain.factory import LangChainChatModelFactory
+from app.runtime.providers.registry import ProviderRegistry
+from app.runtime.execution.chat_executor import LLMOrchestrator
+from app.shared.settings.env import Settings, get_settings
 from app.tools.builtin import register_builtin_tools
 from app.tools.executor import ToolExecutor
-from app.tools.loader import load_custom_tools       # ← NUEVO
+from app.tools.loader import load_custom_tools
 from app.tools.registry import ToolRegistry
 
 

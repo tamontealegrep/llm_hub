@@ -26,8 +26,8 @@ import sys
 import textwrap
 
 from app.bootstrap import build_container, pick_default_provider_and_model
-from app.core.exceptions import AppError
-from app.llm.contracts import StreamEventType
+from app.shared.exceptions import AppError
+from app.capabilities.chat.contracts import StreamEventType
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Colores ANSI (se deshabilitan si stdout no es terminal)

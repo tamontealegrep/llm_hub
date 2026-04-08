@@ -1,4 +1,4 @@
-from app.llm.interfaces import LLMProviderAdapter
+from app.runtime.providers.base import LLMProviderAdapter
 
 
 class ProviderRegistry:

@@ -9,7 +9,7 @@ from uuid import uuid4
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app.core.exceptions import (
+from app.shared.exceptions import (
     AppError,
     ProviderAuthenticationError,
     ProviderError,
@@ -17,15 +17,15 @@ from app.core.exceptions import (
     ProviderTimeoutError,
     ProviderUnavailableError,
 )
-from app.llm.contracts import (
+from app.capabilities.common.models import TokenUsage
+from app.capabilities.chat.contracts import (
     LLMCompletionResult,
     LLMRequest,
     LLMStreamEvent,
     StreamEventType,
-    TokenUsage,
 )
-from app.llm.factory import LangChainChatModelFactory
-from app.llm.interfaces import LLMProviderAdapter
+from app.runtime.providers.langchain.factory import LangChainChatModelFactory
+from app.runtime.providers.base import LLMProviderAdapter
 from app.tools.contracts import ToolCall, ToolDefinition
 
 logger = logging.getLogger(__name__)

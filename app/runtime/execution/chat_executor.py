@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 
-from app.llm.contracts import LLMCompletionResult, LLMRequest, LLMStreamEvent
-from app.llm.registry import ProviderRegistry
+from app.capabilities.chat.contracts import LLMCompletionResult, LLMRequest, LLMStreamEvent
+from app.runtime.providers.registry import ProviderRegistry
 
 
 class LLMOrchestrator:

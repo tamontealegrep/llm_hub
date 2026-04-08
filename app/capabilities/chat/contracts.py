@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Literal
  
 from app.tools.contracts import ToolCall, ToolDefinition
+from app.capabilities.common.models import TokenUsage
  
  
 @dataclass(frozen=True, slots=True)
@@ -66,13 +67,6 @@ class LLMRequest:
     metadata: dict[str, Any] = field(default_factory=dict)
     tools: list[ToolDefinition] = field(default_factory=list)
     tool_choice: str | dict[str, Any] | None = None
- 
- 
-@dataclass(frozen=True, slots=True)
-class TokenUsage:
-    prompt_tokens: int | None = None
-    completion_tokens: int | None = None
-    total_tokens: int | None = None
  
  
 @dataclass(frozen=True, slots=True)

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 
-from app.llm.contracts import LLMCompletionResult, LLMRequest, LLMStreamEvent
+from app.capabilities.chat.contracts import LLMCompletionResult, LLMRequest, LLMStreamEvent
 
 
 class LLMProviderAdapter(ABC):

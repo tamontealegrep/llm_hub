@@ -1,4 +1,4 @@
-from app.core.exceptions import ToolNotFoundError
+from app.shared.exceptions import ToolNotFoundError
 from app.tools.contracts import ToolDefinition
 from app.tools.interfaces import ToolHandler
 

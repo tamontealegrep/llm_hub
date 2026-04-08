@@ -1,8 +1,8 @@
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from app.core.config import Settings
-from app.core.exceptions import ProviderConfigurationError
-from app.llm.contracts import LLMRequestConfig
+from app.shared.settings.env import Settings
+from app.shared.exceptions import ProviderConfigurationError
+from app.capabilities.chat.contracts import LLMRequestConfig
 
 
 class LangChainChatModelFactory:

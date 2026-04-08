@@ -1,8 +1,8 @@
 from uuid import UUID
 
-from app.conversation.interfaces import ConversationRepository
-from app.conversation.models import ConversationSession
-from app.core.exceptions import ConversationNotFoundError
+from app.conversations.interfaces import ConversationRepository
+from app.conversations.entities import ConversationSession
+from app.shared.exceptions import ConversationNotFoundError
 
 
 class InMemoryConversationRepository(ConversationRepository):
