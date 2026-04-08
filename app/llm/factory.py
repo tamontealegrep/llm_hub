@@ -27,9 +27,7 @@ class LangChainChatModelFactory:
             temperature=config.temperature,
             max_tokens=config.max_output_tokens,
             timeout=config.timeout_seconds,
-            # top_p como parámetro directo en lugar de model_kwargs
-            # (model_kwargs es un workaround que puede ignorarse según la versión)
-            model_kwargs={"top_p": config.top_p},
+            top_p=config.top_p,
             # max_retries=2 es el default de langchain-openai; se deja explícito
             # para documentar la decisión (antes estaba en 0, lo que eliminaba
             # la resiliencia ante errores transitorios de red).
@@ -42,14 +40,14 @@ class LangChainChatModelFactory:
 
         from langchain_anthropic import ChatAnthropic
 
+        top_p = config.top_p if config.top_p != 1.0 else None
+
         return ChatAnthropic(
             model=model_key,
             api_key=self._settings.anthropic_api_key,
             temperature=config.temperature,
-            # ChatAnthropic usa max_tokens (no max_output_tokens)
             max_tokens=config.max_output_tokens,
-            # top_p soportado directamente por langchain-anthropic
-            top_p=config.top_p,
+            top_p=top_p,
             timeout=config.timeout_seconds,
         )
 
