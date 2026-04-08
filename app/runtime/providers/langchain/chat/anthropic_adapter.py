@@ -8,4 +8,4 @@ class AnthropicChatAdapter(BaseLangChainChatAdapter):
     provider_code = "anthropic"
 
     def _build_chat_model(self, request: ChatRequest) -> BaseChatModel:
-        return self._factory.build_anthropic(request.model_key, request.config)
+        return self._factory.build_anthropic_chat_model(request.model_key, request.config)
