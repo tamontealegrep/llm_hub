@@ -1,8 +1,8 @@
-from app.runtime.providers.langchain.chat.base import BaseProviderAdapter
+from app.runtime.providers.langchain.chat.base import BaseLangChainChatAdapter
 from app.capabilities.chat.contracts import ChatRequest
 
 
-class GeminiAdapter(BaseProviderAdapter):
+class GeminiAdapter(BaseLangChainChatAdapter):
     """
     Adapter para Google Gemini vía langchain-google-genai.
 

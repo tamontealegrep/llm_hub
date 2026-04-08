@@ -31,7 +31,7 @@ from app.tools.contracts import ToolCall, ToolDefinition
 logger = logging.getLogger(__name__)
 
 
-class BaseProviderAdapter(ChatProviderAdapter, ABC):
+class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
 
     provider_code: ClassVar[str]
 
