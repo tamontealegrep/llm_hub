@@ -15,7 +15,7 @@ from app.capabilities.chat.contracts import (
     ChatStreamEvent,
     ChatStreamEventType,
 )
-from app.runtime.execution.chat_executor import LLMOrchestrator
+from app.runtime.execution.chat_orchestator import ChatOrchestrator
 from app.runtime.providers.registry import ProviderRegistry
 from app.tools.contracts import ToolDefinition, ToolExecutionContext
 from app.tools.executor import ToolExecutor
@@ -29,7 +29,7 @@ class ChatService:
         *,
         repository: ConversationRepository,
         context_builder: ConversationContextBuilder,
-        orchestrator: LLMOrchestrator,
+        orchestrator: ChatOrchestrator,
         provider_registry: ProviderRegistry,
         tool_registry: ToolRegistry | None = None,
         tool_executor: ToolExecutor | None = None,

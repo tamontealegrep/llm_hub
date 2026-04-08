@@ -4,7 +4,7 @@ from app.capabilities.chat.contracts import ChatCompletionResult, ChatRequest, C
 from app.runtime.providers.registry import ProviderRegistry
 
 
-class LLMOrchestrator:
+class ChatOrchestrator:
     """
     Orquestador multiproveedor.
     Selecciona el adapter correcto y delega la invocación.

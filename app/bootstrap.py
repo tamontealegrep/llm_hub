@@ -11,7 +11,7 @@ from app.runtime.providers.langchain.chat.grok_adapter import XAIChatAdapter
 from app.runtime.providers.langchain.chat.openai_adapter import OpenAIChatAdapter
 from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.registry import ProviderRegistry
-from app.runtime.execution.chat_executor import LLMOrchestrator
+from app.runtime.execution.chat_orchestator import ChatOrchestrator
 from app.shared.settings.env import EnvSettings, get_env_settings
 from app.tools.builtin import register_builtin_tools
 from app.tools.executor import ToolExecutor
@@ -105,7 +105,7 @@ def build_container(
 
     repository = InMemoryConversationRepository()
     context_builder = MessageWindowContextBuilder(max_messages=max_context_messages)
-    orchestrator = LLMOrchestrator(registry)
+    orchestrator = ChatOrchestrator(registry)
 
     tool_registry = ToolRegistry()
 
