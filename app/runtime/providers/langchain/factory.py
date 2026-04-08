@@ -5,7 +5,7 @@ from app.shared.exceptions import ProviderConfigurationError
 from app.capabilities.chat.contracts import ChatRequestConfig
 
 
-class LangChainChatModelFactory:
+class LangChainProviderFactory:
     """
     Fábrica central de clientes/modelos LangChain por proveedor.
     Retorna BaseChatModel en todos los métodos para permitir tipado correcto

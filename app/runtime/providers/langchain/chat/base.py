@@ -24,7 +24,7 @@ from app.capabilities.chat.contracts import (
     ChatStreamEvent,
     ChatStreamEventType,
 )
-from app.runtime.providers.langchain.factory import LangChainChatModelFactory
+from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.base import ChatProviderAdapter
 from app.tools.contracts import ToolCall, ToolDefinition
 
@@ -35,7 +35,7 @@ class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
 
     provider_code: ClassVar[str]
 
-    def __init__(self, factory: LangChainChatModelFactory) -> None:
+    def __init__(self, factory: LangChainProviderFactory) -> None:
         self._factory = factory
 
     # ------------------------------------------------------------------

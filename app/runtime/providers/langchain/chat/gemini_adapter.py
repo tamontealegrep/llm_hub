@@ -9,7 +9,7 @@ class GeminiAdapter(BaseLangChainChatAdapter):
     El workaround que fusionaba SystemMessage dentro del primer HumanMessage
     fue eliminado. ChatGoogleGenerativeAI >= 1.x soporta SystemMessage
     nativamente cuando convert_system_message_to_human=False (configurado
-    en LangChainChatModelFactory.build_gemini).
+    en LangChainProviderFactory.build_gemini).
 
     Si necesitas compatibilidad con versiones antiguas de langchain-google-genai
     (< 1.0), restaura el método _prepare_messages de la versión anterior y

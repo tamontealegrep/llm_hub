@@ -9,7 +9,7 @@ from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicAdap
 from app.runtime.providers.langchain.chat.gemini_adapter import GeminiAdapter
 from app.runtime.providers.langchain.chat.grok_adapter import GrokAdapter
 from app.runtime.providers.langchain.chat.openai_adapter import OpenAIAdapter
-from app.runtime.providers.langchain.factory import LangChainChatModelFactory
+from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.registry import ProviderRegistry
 from app.runtime.execution.chat_executor import LLMOrchestrator
 from app.shared.settings.env import EnvSettings, get_env_settings
@@ -28,7 +28,7 @@ class AppContainer:
 
 
 def build_registry(settings: EnvSettings) -> ProviderRegistry:
-    factory = LangChainChatModelFactory(settings)
+    factory = LangChainProviderFactory(settings)
     registry = ProviderRegistry()
 
     if settings.openai_api_key:
