@@ -6,8 +6,8 @@ from app.conversations.repository import InMemoryConversationRepository
 from app.capabilities.chat.service import ChatService
 from app.capabilities.chat.contracts import ChatRequestConfig
 from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicChatAdapter
-from app.runtime.providers.langchain.chat.gemini_adapter import GoogleChatAdapter
-from app.runtime.providers.langchain.chat.grok_adapter import XAIChatAdapter
+from app.runtime.providers.langchain.chat.google_adapter import GoogleChatAdapter
+from app.runtime.providers.langchain.chat.xai_adapter import XAIChatAdapter
 from app.runtime.providers.langchain.chat.openai_adapter import OpenAIChatAdapter
 from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.registry import ProviderRegistry
