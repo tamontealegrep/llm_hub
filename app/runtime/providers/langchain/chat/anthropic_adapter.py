@@ -4,7 +4,7 @@ from app.runtime.providers.langchain.chat.base import BaseLangChainChatAdapter
 from app.capabilities.chat.contracts import ChatRequest
 
 
-class AnthropicAdapter(BaseLangChainChatAdapter):
+class AnthropicChatAdapter(BaseLangChainChatAdapter):
     provider_code = "anthropic"
 
     def _build_chat_model(self, request: ChatRequest) -> BaseChatModel:

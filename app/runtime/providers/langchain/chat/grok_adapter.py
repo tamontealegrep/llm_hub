@@ -4,7 +4,7 @@ from app.runtime.providers.langchain.chat.base import BaseLangChainChatAdapter
 from app.capabilities.chat.contracts import ChatRequest
 
 
-class GrokAdapter(BaseLangChainChatAdapter):
+class XAIChatAdapter(BaseLangChainChatAdapter):
     provider_code = "xai"
 
     def _build_chat_model(self, request: ChatRequest) -> BaseChatModel:

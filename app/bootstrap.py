@@ -5,10 +5,10 @@ from app.conversations.context.message_window import MessageWindowContextBuilder
 from app.conversations.repository import InMemoryConversationRepository
 from app.capabilities.chat.service import ChatService
 from app.capabilities.chat.contracts import ChatRequestConfig
-from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicAdapter
-from app.runtime.providers.langchain.chat.gemini_adapter import GeminiAdapter
-from app.runtime.providers.langchain.chat.grok_adapter import GrokAdapter
-from app.runtime.providers.langchain.chat.openai_adapter import OpenAIAdapter
+from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicChatAdapter
+from app.runtime.providers.langchain.chat.gemini_adapter import GoogleChatAdapter
+from app.runtime.providers.langchain.chat.grok_adapter import XAIChatAdapter
+from app.runtime.providers.langchain.chat.openai_adapter import OpenAIChatAdapter
 from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.registry import ProviderRegistry
 from app.runtime.execution.chat_executor import LLMOrchestrator
@@ -32,16 +32,16 @@ def build_registry(settings: EnvSettings) -> ProviderRegistry:
     registry = ProviderRegistry()
 
     if settings.openai_api_key:
-        registry.register(OpenAIAdapter(factory))
+        registry.register(OpenAIChatAdapter(factory))
 
     if settings.anthropic_api_key:
-        registry.register(AnthropicAdapter(factory))
+        registry.register(AnthropicChatAdapter(factory))
 
     if settings.google_api_key:
-        registry.register(GeminiAdapter(factory))
+        registry.register(GoogleChatAdapter(factory))
 
     if settings.xai_api_key:
-        registry.register(GrokAdapter(factory))
+        registry.register(XAIChatAdapter(factory))
 
     return registry
 

@@ -65,7 +65,7 @@ class LangChainProviderFactory:
             top_p=config.top_p,
             # convert_system_message_to_human=False permite que SystemMessage
             # se envíe nativamente (soportado desde langchain-google-genai >= 1.x).
-            # El workaround manual en GeminiAdapter ya no es necesario.
+            # El workaround manual en GoogleChatAdapter ya no es necesario.
             convert_system_message_to_human=False,
         )
 

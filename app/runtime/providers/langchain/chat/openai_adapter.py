@@ -4,7 +4,7 @@ from app.runtime.providers.langchain.chat.base import BaseLangChainChatAdapter
 from app.capabilities.chat.contracts import ChatRequest
 
 
-class OpenAIAdapter(BaseLangChainChatAdapter):
+class OpenAIChatAdapter(BaseLangChainChatAdapter):
     provider_code = "openai"
 
     def _build_chat_model(self, request: ChatRequest) -> BaseChatModel:
