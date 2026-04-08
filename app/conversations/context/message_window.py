@@ -1,18 +1,18 @@
-from app.conversations.interfaces import ContextBuilder
+from app.conversations.interfaces import ConversationContextBuilder
 from app.conversations.entities import ConversationRole, ConversationSession
 from app.capabilities.chat.contracts import ChatMessage
 
 
-class SimpleContextBuilder(ContextBuilder):
+class SimpleContextBuilder(ConversationContextBuilder):
     """
-    Implementación de ContextBuilder.
+    Implementación de ConversationContextBuilder.
 
     Comportamiento:
     - incluye system prompt si existe
     - incluye historial conversacional en orden
     - opcionalmente recorta por cantidad de mensajes (sin trimming por tokens)
 
-    Para trimming por tokens, implementar ContextBuilder con tiktoken u otro
+    Para trimming por tokens, implementar ConversationContextBuilder con tiktoken u otro
     contador de tokens sin modificar ConversationService.
     """
 

@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from uuid import UUID
 
-from app.conversations.interfaces import ContextBuilder, ConversationRepository
+from app.conversations.interfaces import ConversationContextBuilder, ConversationRepository
 from app.conversations.entities import ConversationSession
 from app.shared.exceptions import (
     InvalidProviderSelectionError,
@@ -28,7 +28,7 @@ class ConversationService:
         self,
         *,
         repository: ConversationRepository,
-        context_builder: ContextBuilder,
+        context_builder: ConversationContextBuilder,
         orchestrator: LLMOrchestrator,
         provider_registry: ProviderRegistry,
         tool_registry: ToolRegistry | None = None,

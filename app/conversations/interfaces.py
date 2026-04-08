@@ -28,7 +28,7 @@ class ConversationRepository(ABC):
     async def save(self, session: ConversationSession) -> None: ...
 
 
-class ContextBuilder(ABC):
+class ConversationContextBuilder(ABC):
     """
     Contrato abstracto para la construcción del contexto que se envía al modelo.
     Permite intercambiar SimpleContextBuilder por versiones con trimming por tokens,
