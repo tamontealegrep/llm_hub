@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from app.capabilities.chat.contracts import ChatCompletionResult, ChatRequest, ChatStreamEvent
 
 
-class LLMProviderAdapter(ABC):
+class ChatProviderAdapter(ABC):
     """
     Interfaz común para cualquier proveedor LLM.
     """

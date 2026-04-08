@@ -25,13 +25,13 @@ from app.capabilities.chat.contracts import (
     ChatStreamEventType,
 )
 from app.runtime.providers.langchain.factory import LangChainChatModelFactory
-from app.runtime.providers.base import LLMProviderAdapter
+from app.runtime.providers.base import ChatProviderAdapter
 from app.tools.contracts import ToolCall, ToolDefinition
 
 logger = logging.getLogger(__name__)
 
 
-class BaseProviderAdapter(LLMProviderAdapter, ABC):
+class BaseProviderAdapter(ChatProviderAdapter, ABC):
 
     provider_code: ClassVar[str]
 

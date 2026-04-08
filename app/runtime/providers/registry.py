@@ -1,4 +1,4 @@
-from app.runtime.providers.base import LLMProviderAdapter
+from app.runtime.providers.base import ChatProviderAdapter
 
 
 class ProviderRegistry:
@@ -7,14 +7,14 @@ class ProviderRegistry:
     """
 
     def __init__(self) -> None:
-        self._providers: dict[str, LLMProviderAdapter] = {}
+        self._providers: dict[str, ChatProviderAdapter] = {}
 
-    def register(self, adapter: LLMProviderAdapter) -> None:
+    def register(self, adapter: ChatProviderAdapter) -> None:
         if adapter.provider_code in self._providers:
             raise ValueError(f"El provider '{adapter.provider_code}' ya está registrado")
         self._providers[adapter.provider_code] = adapter
 
-    def get(self, provider_code: str) -> LLMProviderAdapter:
+    def get(self, provider_code: str) -> ChatProviderAdapter:
         try:
             return self._providers[provider_code]
         except KeyError as exc:
