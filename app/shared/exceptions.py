@@ -141,6 +141,31 @@ class ConfigurationError(AppError):
         )
 
 
+class InvalidModelParameterValueError(AppError):
+    def __init__(
+        self,
+        provider_code: str,
+        model_key: str,
+        parameter_name: str,
+        value: object,
+        reason: str,
+    ) -> None:
+        super().__init__(
+            (
+                f"Valor inválido para '{parameter_name}' en "
+                f"'{provider_code}/{model_key}': {value!r}. {reason}"
+            ),
+            error_code="invalid_model_parameter_value",
+            details={
+                "provider_code": provider_code,
+                "model_key": model_key,
+                "parameter_name": parameter_name,
+                "value": value,
+                "reason": reason,
+            },
+        )
+
+        
 class ModelCatalogError(AppError):
     def __init__(
         self,
@@ -152,4 +177,58 @@ class ModelCatalogError(AppError):
             message,
             error_code="model_catalog_error",
             details=details,
+        )
+
+
+class ModelNotInCatalogError(AppError):
+    def __init__(self, provider_code: str, model_key: str) -> None:
+        super().__init__(
+            f"El modelo '{provider_code}/{model_key}' no existe en el catálogo",
+            error_code="model_not_in_catalog",
+            details={
+                "provider_code": provider_code,
+                "model_key": model_key,
+            },
+        )
+
+
+class UnsupportedModelCapabilityError(AppError):
+    def __init__(
+        self,
+        provider_code: str,
+        model_key: str,
+        capability: str,
+    ) -> None:
+        super().__init__(
+            (
+                f"El modelo '{provider_code}/{model_key}' no soporta "
+                f"la capability '{capability}'"
+            ),
+            error_code="unsupported_model_capability",
+            details={
+                "provider_code": provider_code,
+                "model_key": model_key,
+                "capability": capability,
+            },
+        )
+
+
+class UnsupportedModelParameterError(AppError):
+    def __init__(
+        self,
+        provider_code: str,
+        model_key: str,
+        parameter_name: str,
+    ) -> None:
+        super().__init__(
+            (
+                f"El modelo '{provider_code}/{model_key}' no soporta "
+                f"el parámetro '{parameter_name}'"
+            ),
+            error_code="unsupported_model_parameter",
+            details={
+                "provider_code": provider_code,
+                "model_key": model_key,
+                "parameter_name": parameter_name,
+            },
         )
