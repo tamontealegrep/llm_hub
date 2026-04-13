@@ -17,10 +17,9 @@ from app.runtime.providers.registry import ProviderRegistry
 from app.runtime.execution.chat_orchestrator import ChatOrchestrator
 from app.shared.settings.loader import RuntimeSettings, get_settings
 from app.shared.settings.env import EnvSettings
-from app.tools.builtin import register_builtin_tools
-from app.tools.executor import ToolExecutor
-from app.tools.loader import load_custom_tools
+from app.tools.loader import load_builtin_tools, load_custom_tools
 from app.tools.registry import ToolRegistry
+from app.tools.executor import ToolExecutor
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,7 +150,7 @@ def build_container(
     # Si una tool builtin y una custom tienen el mismo nombre,
     # la custom NO sobreescribe (el registry lanza ValueError en duplicados).
     if with_builtin_tools:
-        register_builtin_tools(tool_registry)
+        load_builtin_tools(tool_registry)
 
     if with_custom_tools:
         load_custom_tools(tool_registry)
