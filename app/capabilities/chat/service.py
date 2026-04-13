@@ -20,6 +20,7 @@ from app.runtime.providers.registry import ProviderRegistry
 from app.tools.contracts import ToolDefinition, ToolExecutionContext
 from app.tools.executor import ToolExecutor
 from app.tools.registry import ToolRegistry
+from app.model_catalog.service import ModelCatalogService
 
 
 class ChatService:
@@ -31,6 +32,7 @@ class ChatService:
         context_builder: ConversationContextBuilder,
         orchestrator: ChatOrchestrator,
         provider_registry: ProviderRegistry,
+        model_catalog: ModelCatalogService,
         tool_registry: ToolRegistry | None = None,
         tool_executor: ToolExecutor | None = None,
         default_config: ChatRequestConfig | None = None,
@@ -43,6 +45,7 @@ class ChatService:
         self._context_builder = context_builder
         self._orchestrator = orchestrator
         self._provider_registry = provider_registry
+        self._model_catalog = model_catalog
         self._tool_registry = resolved_tool_registry
         self._tool_executor = resolved_tool_executor
         self._default_config = default_config or ChatRequestConfig()
@@ -59,10 +62,9 @@ class ChatService:
         model_key: str,
         system_prompt: str | None = None,
     ) -> ConversationSession:
-        if not self._provider_registry.has(provider_code):
-            raise InvalidProviderSelectionError(
-                f"No hay adapter registrado para provider '{provider_code}'"
-            )
+        self._ensure_provider_available(provider_code)
+        self._validate_chat_target(provider_code, model_key)
+
         return await self._repository.create(
             provider_code=provider_code,
             model_key=model_key,
@@ -82,17 +84,21 @@ class ChatService:
         provider_code: str | None = None,
         model_key: str | None = None,
     ) -> ConversationSession:
-        if provider_code is not None and model_key is None:
-            raise InvalidProviderSelectionError(
-                "Si cambias provider_code, debes indicar también model_key"
-            )
-        if provider_code is not None and not self._provider_registry.has(provider_code):
-            raise InvalidProviderSelectionError(
-                f"No hay adapter registrado para provider '{provider_code}'"
-            )
-
         session = await self._repository.get(conversation_id)
-        session.switch_model(provider_code=provider_code, model_key=model_key)
+
+        target_provider_code, target_model_key = self._resolve_effective_target(
+            session=session,
+            provider_code=provider_code,
+            model_key=model_key,
+        )
+
+        self._ensure_provider_available(target_provider_code)
+        self._validate_chat_target(target_provider_code, target_model_key)
+
+        session.switch_model(
+            provider_code=target_provider_code,
+            model_key=target_model_key,
+        )
         await self._repository.save(session)
         return session
 
@@ -119,11 +125,21 @@ class ChatService:
         """
         tool_definitions = self._resolve_tool_definitions(tool_names)
 
+        session, target_provider_code, target_model_key = (
+            await self._load_validated_session_target(
+                conversation_id=conversation_id,
+                provider_code=provider_code,
+                model_key=model_key,
+                tools_enabled=bool(tool_definitions),
+                streaming=False,
+            )
+        )
+
         session = await self._prepare_session(
-            conversation_id=conversation_id,
+            session=session,
             user_text=user_text,
-            provider_code=provider_code,
-            model_key=model_key,
+            target_provider_code=target_provider_code,
+            target_model_key=target_model_key,
         )
 
         for iteration in range(self._max_tool_iterations + 1):
@@ -195,11 +211,21 @@ class ChatService:
         """
         tool_definitions = self._resolve_tool_definitions(tool_names)
 
+        session, target_provider_code, target_model_key = (
+            await self._load_validated_session_target(
+                conversation_id=conversation_id,
+                provider_code=provider_code,
+                model_key=model_key,
+                tools_enabled=bool(tool_definitions),
+                streaming=True,
+            )
+        )
+
         session = await self._prepare_session(
-            conversation_id=conversation_id,
+            session=session,
             user_text=user_text,
-            provider_code=provider_code,
-            model_key=model_key,
+            target_provider_code=target_provider_code,
+            target_model_key=target_model_key,
         )
 
         return self._stream_generator(
@@ -365,26 +391,19 @@ class ChatService:
     async def _prepare_session(
         self,
         *,
-        conversation_id: UUID,
+        session: ConversationSession,
         user_text: str,
-        provider_code: str | None,
-        model_key: str | None,
+        target_provider_code: str,
+        target_model_key: str,
     ) -> ConversationSession:
-        if provider_code is not None and model_key is None:
-            raise InvalidProviderSelectionError(
-                "Si cambias provider_code, debes indicar también model_key"
+        if (
+            session.current_provider_code != target_provider_code
+            or session.current_model_key != target_model_key
+        ):
+            session.switch_model(
+                provider_code=target_provider_code,
+                model_key=target_model_key,
             )
-
-        session = await self._repository.get(conversation_id)
-
-        if provider_code is not None:
-            if not self._provider_registry.has(provider_code):
-                raise InvalidProviderSelectionError(
-                    f"No hay adapter registrado para provider '{provider_code}'"
-                )
-            session.switch_model(provider_code=provider_code, model_key=model_key)
-        elif model_key is not None:
-            session.switch_model(model_key=model_key)
 
         session.add_user_message(user_text)
         await self._repository.save(session)
@@ -438,3 +457,81 @@ class ChatService:
             metadata=metadata,
             tools=resolved_tools,
         )
+    
+    def _ensure_provider_available(self, provider_code: str) -> None:
+        if not self._provider_registry.has(provider_code):
+            raise InvalidProviderSelectionError(
+                f"No hay adapter registrado para provider '{provider_code}'"
+            )
+        
+    def _validate_chat_target(self, provider_code: str, model_key: str) -> None:
+        self._model_catalog.require_model(provider_code, model_key)
+        self._model_catalog.require_capability(provider_code, model_key, "chat")
+
+    def _validate_chat_operation_capabilities(
+        self,
+        provider_code: str,
+        model_key: str,
+        *,
+        tools_enabled: bool,
+        streaming: bool,
+    ) -> None:
+        self._validate_chat_target(provider_code, model_key)
+
+        if tools_enabled:
+            self._model_catalog.require_capability(provider_code, model_key, "tools")
+
+        if streaming:
+            self._model_catalog.require_capability(provider_code, model_key, "streaming")
+
+    def _resolve_effective_target(
+        self,
+        *,
+        session: ConversationSession,
+        provider_code: str | None,
+        model_key: str | None,
+    ) -> tuple[str, str]:
+        if provider_code is not None and model_key is None:
+            raise InvalidProviderSelectionError(
+                "Si cambias provider_code, debes indicar también model_key"
+            )
+
+        if provider_code is not None:
+            resolved_model_key = model_key
+            if resolved_model_key is None:
+                raise InvalidProviderSelectionError(
+                    "Si cambias provider_code, debes indicar también model_key"
+                )
+            return provider_code, resolved_model_key
+
+        if model_key is not None:
+            return session.current_provider_code, model_key
+
+        return session.current_provider_code, session.current_model_key
+    
+    async def _load_validated_session_target(
+        self,
+        *,
+        conversation_id: UUID,
+        provider_code: str | None,
+        model_key: str | None,
+        tools_enabled: bool,
+        streaming: bool,
+    ) -> tuple[ConversationSession, str, str]:
+        session = await self._repository.get(conversation_id)
+
+        target_provider_code, target_model_key = self._resolve_effective_target(
+            session=session,
+            provider_code=provider_code,
+            model_key=model_key,
+        )
+
+        self._ensure_provider_available(target_provider_code)
+        self._validate_chat_operation_capabilities(
+            target_provider_code,
+            target_model_key,
+            tools_enabled=tools_enabled,
+            streaming=streaming,
+        )
+
+        return session, target_provider_code, target_model_key

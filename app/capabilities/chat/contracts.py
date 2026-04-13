@@ -56,7 +56,15 @@ class ChatRequestConfig:
     top_p: float = 1.0
     max_output_tokens: int = 2048
     timeout_seconds: int = 60
- 
+
+    def to_param_dict(self) -> dict[str, object]:
+        return {
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "max_output_tokens": self.max_output_tokens,
+            "timeout_seconds": self.timeout_seconds,
+        }
+    
  
 @dataclass(frozen=True, slots=True)
 class ChatRequest:

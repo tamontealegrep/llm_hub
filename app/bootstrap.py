@@ -40,21 +40,24 @@ def build_model_catalog(settings: RuntimeSettings) -> ModelCatalogService:
     return ModelCatalogService(repository)
 
 
-def build_chat_provider_registry(env_settings: EnvSettings) -> ProviderRegistry:
+def build_chat_provider_registry(
+    env_settings: EnvSettings,
+    model_catalog: ModelCatalogService,
+) -> ProviderRegistry:
     factory = LangChainProviderFactory(env_settings)
     provider_registry = ProviderRegistry()
 
     if env_settings.openai_api_key:
-        provider_registry.register(OpenAIChatAdapter(factory))
+        provider_registry.register(OpenAIChatAdapter(factory, model_catalog))
 
     if env_settings.anthropic_api_key:
-        provider_registry.register(AnthropicChatAdapter(factory))
+        provider_registry.register(AnthropicChatAdapter(factory, model_catalog))
 
     if env_settings.google_api_key:
-        provider_registry.register(GoogleChatAdapter(factory))
+        provider_registry.register(GoogleChatAdapter(factory, model_catalog))
 
     if env_settings.xai_api_key:
-        provider_registry.register(XAIChatAdapter(factory))
+        provider_registry.register(XAIChatAdapter(factory, model_catalog))
 
     return provider_registry
 
@@ -109,7 +112,10 @@ def build_container(
         raise RuntimeError("La capability de chat está deshabilitada en configuración")
     
     model_catalog = build_model_catalog(resolved_settings)
-    provider_registry = build_chat_provider_registry(resolved_settings.env)
+    provider_registry = build_chat_provider_registry(
+        resolved_settings.env,
+        model_catalog,
+    )
 
     if not provider_registry.available_provider_codes():
         raise RuntimeError(
@@ -157,6 +163,7 @@ def build_container(
         context_builder=context_builder,
         orchestrator=chat_orchestrator,
         provider_registry=provider_registry,
+        model_catalog=model_catalog,
         tool_registry=tool_registry,
         tool_executor=tool_executor,
         default_config=resolved_default_chat_config,

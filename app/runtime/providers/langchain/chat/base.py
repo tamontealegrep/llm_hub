@@ -27,6 +27,7 @@ from app.capabilities.chat.contracts import (
 from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.base import ChatProviderAdapter
 from app.tools.contracts import ToolCall, ToolDefinition
+from app.model_catalog.service import ModelCatalogService
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +36,13 @@ class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
 
     provider_code: ClassVar[str]
 
-    def __init__(self, factory: LangChainProviderFactory) -> None:
+    def __init__(
+        self,
+        factory: LangChainProviderFactory,
+        model_catalog: ModelCatalogService,
+    ) -> None:
         self._factory = factory
+        self._model_catalog = model_catalog
 
     # ------------------------------------------------------------------
     # Método abstracto — cada adapter concreto lo implementa
@@ -474,12 +480,63 @@ class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
             return ProviderUnavailableError(f"Proveedor '{self.provider_code}' no disponible")
 
         return ProviderError(f"Error invocando proveedor '{self.provider_code}'")
+    
+    # ------------------------------------------------------------------
+    # Validar con el catalogo
+    # ------------------------------------------------------------------
+    def _iter_request_params(self, request: ChatRequest) -> dict[str, Any]:
+        params = dict(request.config.to_param_dict())
+
+        if request.tool_choice is not None:
+            params["tool_choice"] = request.tool_choice
+
+        return params
+
+    def _validate_request_config_against_catalog(self, request: ChatRequest) -> None:
+        for param_name, value in self._iter_request_params(request).items():
+            self._model_catalog.validate_param_value(
+                request.provider_code,
+                request.model_key,
+                param_name,
+                value,
+            )
+
+    def _validate_request_against_catalog(
+        self,
+        request: ChatRequest,
+        *,
+        streaming: bool,
+    ) -> None:
+        self._model_catalog.require_model(request.provider_code, request.model_key)
+        self._model_catalog.require_capability(
+            request.provider_code,
+            request.model_key,
+            "chat",
+        )
+
+        if request.tools:
+            self._model_catalog.require_capability(
+                request.provider_code,
+                request.model_key,
+                "tools",
+            )
+
+        if streaming:
+            self._model_catalog.require_capability(
+                request.provider_code,
+                request.model_key,
+                "streaming",
+            )
+
+        self._validate_request_config_against_catalog(request)
 
     # ------------------------------------------------------------------
     # complete() — invocación sin streaming
     # ------------------------------------------------------------------
 
     async def complete(self, request: ChatRequest) -> ChatCompletionResult:
+        self._validate_request_against_catalog(request, streaming=False)
+
         model = self._prepare_model(request)
         messages = self._prepare_messages(request)
 
@@ -565,6 +622,8 @@ class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
         para que errores de configuración (API key, binding de tools, roles
         inválidos) se propaguen como excepciones normales y no como eventos ERROR.
         """
+        self._validate_request_against_catalog(request, streaming=True)
+
         model = self._prepare_model(request)
         messages = self._prepare_messages(request)
 
