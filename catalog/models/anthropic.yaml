@@ -1,10 +1,10 @@
 provider_code: anthropic
 display_name: Anthropic
-default_chat_model: claude-3-5-sonnet-latest
+default_chat_model: claude-haiku-4-5
 
 models:
-  - key: claude-3-5-sonnet-latest
-    display_name: Claude 3.5 Sonnet
+  - key: claude-sonnet-4-5
+    display_name: Claude 4.5 Sonnet
     description: Modelo balanceado para razonamiento y tool use.
     capabilities:
       chat: true
@@ -50,8 +50,8 @@ models:
       - reasoning
       - tools
 
-  - key: claude-3-5-haiku-latest
-    display_name: Claude 3.5 Haiku
+  - key: claude-haiku-4-5
+    display_name: Claude 4.5 Haiku
     description: Modelo rápido y económico para chat general.
     capabilities:
       chat: true
@@ -95,3 +95,98 @@ models:
     tags:
       - chat
       - economical
+
+  - key: claude-sonnet-4-6
+    display_name: Claude 4.6 Sonnet
+    description: Modelo balanceado de alta velocidad con excelente razonamiento y tool use.
+    capabilities:
+      chat: true
+      image_generation: false
+      agents: true
+      embeddings: false
+      tools: true
+      streaming: true
+      structured_output: true
+      vision_input: true
+    defaults:
+      temperature: 0.2
+      top_p: 1.0
+      max_output_tokens: 4096
+      timeout_seconds: 60
+    supported_params:
+      temperature:
+        supported: true
+        default: 0.2
+        min: 0.0
+        max: 1.0
+      top_p:
+        supported: true
+        default: 1.0
+        min: 0.0
+        max: 1.0
+      max_output_tokens:
+        supported: true
+        default: 4096
+        min: 1
+      timeout_seconds:
+        supported: true
+        default: 60
+        min: 1
+      tools:
+        supported: true
+      tool_choice:
+        supported: true
+      stream:
+        supported: true
+    tags:
+      - chat
+      - premium
+      - reasoning
+      - tools
+
+  - key: claude-opus-4-6
+    display_name: Claude 4.6 Opus
+    description: Modelo más potente para tareas complejas de razonamiento avanzado y agentes.
+    capabilities:
+      chat: true
+      image_generation: false
+      agents: true
+      embeddings: false
+      tools: true
+      streaming: true
+      structured_output: true
+      vision_input: true
+    defaults:
+      temperature: 0.2
+      top_p: 1.0
+      max_output_tokens: 4096
+      timeout_seconds: 90
+    supported_params:
+      temperature:
+        supported: true
+        default: 0.2
+        min: 0.0
+        max: 1.0
+      top_p:
+        supported: true
+        default: 1.0
+        min: 0.0
+        max: 1.0
+      max_output_tokens:
+        supported: true
+        default: 4096
+        min: 1
+      timeout_seconds:
+        supported: true
+        default: 90
+        min: 1
+      tools:
+        supported: true
+      tool_choice:
+        supported: true
+      stream:
+        supported: true
+    tags:
+      - chat
+      - reasoning
+      - premium

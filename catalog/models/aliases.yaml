@@ -1,12 +1,12 @@
 aliases:
   smart-chat:
     provider_code: anthropic
-    model_key: claude-3-5-sonnet-latest
+    model_key: claude-sonnet-4-5
     capability: chat
 
   fast-chat:
     provider_code: google
-    model_key: gemini-1.5-flash
+    model_key: gemini-2.5-flash
     capability: chat
 
   cheap-chat:
