@@ -1,6 +1,6 @@
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from app.runtime.providers.langchain.chat.base import ProviderAdapterMeta, BaseLangChainChatAdapter
+from app.runtime.providers.langchain.chat.core import ProviderAdapterMeta, BaseLangChainChatAdapter
 from app.capabilities.chat.contracts import ChatRequest
 from app.shared.exceptions import (
     ProviderTimeoutError,
@@ -11,12 +11,12 @@ from app.shared.exceptions import (
 )
 
 
-class AnthropicChatAdapter(BaseLangChainChatAdapter):
-    provider_code = "anthropic"
+class OpenAIChatAdapter(BaseLangChainChatAdapter):
+    provider_code = "openai"
     adapter_meta = ProviderAdapterMeta(
-        provider_code="anthropic",
-        env_key_name="anthropic_api_key",
-        required_packages=["langchain_anthropic"],
+        provider_code="openai",
+        env_key_name="openai_api_key",
+        required_packages=["langchain_openai"],
     )
 
     def _build_chat_model(self, request: ChatRequest) -> BaseChatModel:
@@ -24,14 +24,14 @@ class AnthropicChatAdapter(BaseLangChainChatAdapter):
 
     def _normalize_exception(self, exc: Exception) -> Exception:
         try:
-            import anthropic
-            if isinstance(exc, anthropic.APITimeoutError):
+            import openai
+            if isinstance(exc, openai.APITimeoutError):
                 return ProviderTimeoutError(f"Timeout invocando proveedor '{self.provider_code}'")
-            if isinstance(exc, anthropic.RateLimitError):
+            if isinstance(exc, openai.RateLimitError):
                 return ProviderRateLimitError(f"Rate limit en proveedor '{self.provider_code}'")
-            if isinstance(exc, anthropic.AuthenticationError):
+            if isinstance(exc, openai.AuthenticationError):
                 return ProviderAuthenticationError(f"Auth error en proveedor '{self.provider_code}'")
-            if isinstance(exc, anthropic.APIStatusError) and exc.status_code == 503:
+            if isinstance(exc, openai.APIStatusError) and exc.status_code == 503:
                 return ProviderUnavailableError(f"Proveedor '{self.provider_code}' no disponible")
         except ImportError:
             pass
