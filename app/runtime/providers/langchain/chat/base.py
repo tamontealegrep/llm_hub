@@ -3,6 +3,7 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 from typing import Any, ClassVar
 from uuid import uuid4
 
@@ -31,10 +32,23 @@ from app.model_catalog.service import ModelCatalogService
 
 logger = logging.getLogger(__name__)
 
+@dataclass(frozen=True)
+class ProviderAdapterMeta:
+    """
+    Metadatos que cada adapter declara sobre sí mismo.
+    El sistema los usa para auto-registro y para saber
+    qué credencial necesita del entorno.
+    """
+    provider_code: str
+    env_key_name: str | None = None
+    required_packages: list[str] = field(default_factory=list)
+    is_local: bool = False
+
 
 class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
 
     provider_code: ClassVar[str]
+    adapter_meta: ClassVar[ProviderAdapterMeta]
 
     def __init__(
         self,
