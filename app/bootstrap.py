@@ -44,10 +44,16 @@ def build_chat_provider_registry(
     factory = LangChainProviderFactory(env_settings)
     provider_registry = ProviderRegistry()
 
+    active_in_catalog = {p for p in model_catalog.list_provider_codes()}
+
     adapter_classes = discover_chat_adapters()
 
     for adapter_cls in adapter_classes:
         meta = adapter_cls.adapter_meta
+        provider_code = meta.provider_code
+
+        if provider_code not in active_in_catalog:
+            continue
 
         # Para providers cloud: verificar que la API key esté presente
         if meta.env_key_name:
@@ -153,7 +159,7 @@ def build_container(
         raise RuntimeError(
             "No hay proveedores configurados. Revisa tu .env y las API keys."
         )
-    
+
     validate_provider_registry_against_catalog(provider_registry, model_catalog)
 
     default_provider_code, default_model_key = pick_default_chat_provider_and_model(

@@ -78,6 +78,10 @@ def load_model_catalog(directory: str | Path) -> ModelCatalogBundle:
 
             aliases = alias_catalog.aliases
             continue
+        
+        models_in_raw = raw_data.get("models", [])
+        if not models_in_raw:
+            continue
 
         try:
             provider_catalog = ProviderCatalogSchema.model_validate(raw_data)

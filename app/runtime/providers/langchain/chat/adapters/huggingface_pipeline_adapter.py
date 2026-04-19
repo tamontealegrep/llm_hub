@@ -22,7 +22,7 @@ Cuándo usar este en vez de Ollama:
 """
 from langchain_core.language_models.chat_models import BaseChatModel
 
-from app.runtime.providers.langchain.chat.base import BaseLangChainChatAdapter, ProviderAdapterMeta
+from app.runtime.providers.langchain.chat.core import ProviderAdapterMeta, BaseLangChainChatAdapter
 from app.capabilities.chat.contracts import ChatRequest
 
 
