@@ -27,7 +27,7 @@ class EnvSettings(BaseSettings):
     # HuggingFace Inference Endpoint sí necesita key.
     huggingface_api_key: str | None = None  # para HF Inference Endpoints
     # URL base de Ollama (default: http://localhost:11434)
-    ollama_base_url: str = "http://localhost:11434"
+    ollama_base_url: str | None = None 
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,4 +1,5 @@
 # app/bootstrap.py
+import warnings
 from dataclasses import dataclass
 
 from app.conversations.context.message_window import MessageWindowContextBuilder
@@ -96,10 +97,13 @@ def validate_provider_registry_against_catalog(
 ) -> None:
     for provider_code in provider_registry.available_provider_codes():
         if not model_catalog.provider_exists(provider_code):
-            raise RuntimeError(
-                f"El provider '{provider_code}' tiene credenciales configuradas, "
-                f"pero no existe en catalog/models."
+            warnings.warn(
+                f"\n[LLM Hub Config] El proveedor '{provider_code}' está registrado en el sistema "
+                "pero no tiene un archivo de configuración en catalog\models. "
+                f"Se desactivará para esta sesión.",
+                RuntimeWarning  # Categoría de la advertencia
             )
+            continue
 
 
 def pick_default_chat_provider_and_model(

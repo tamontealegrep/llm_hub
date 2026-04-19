@@ -22,6 +22,6 @@ routing:
     - anthropic
     - google
     - xai
-    - ollama
-    - huggingface_pipeline
-    - huggingface_endpoint
+    # - ollama
+    # - huggingface_pipeline
+    # - huggingface_endpoint
