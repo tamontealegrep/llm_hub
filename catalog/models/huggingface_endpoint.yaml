@@ -1,0 +1,5 @@
+provider_code: huggingface_endpoint
+display_name: HuggingFace Inference Endpoint
+default_chat_model: null
+
+models: []
