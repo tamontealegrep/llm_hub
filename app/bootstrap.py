@@ -8,10 +8,7 @@ from app.capabilities.chat.contracts import ChatRequestConfig
 from app.model_catalog.loader import load_model_catalog
 from app.model_catalog.repository import InMemoryModelCatalogRepository
 from app.model_catalog.service import ModelCatalogService
-from app.runtime.providers.langchain.chat.anthropic_adapter import AnthropicChatAdapter
-from app.runtime.providers.langchain.chat.google_adapter import GoogleChatAdapter
-from app.runtime.providers.langchain.chat.xai_adapter import XAIChatAdapter
-from app.runtime.providers.langchain.chat.openai_adapter import OpenAIChatAdapter
+from app.runtime.providers.langchain.chat.discovery import discover_chat_adapters
 from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.registry import ProviderRegistry
 from app.runtime.execution.chat_orchestrator import ChatOrchestrator
@@ -46,20 +43,52 @@ def build_chat_provider_registry(
     factory = LangChainProviderFactory(env_settings)
     provider_registry = ProviderRegistry()
 
-    if env_settings.openai_api_key:
-        provider_registry.register(OpenAIChatAdapter(factory, model_catalog))
+    adapter_classes = discover_chat_adapters()
 
-    if env_settings.anthropic_api_key:
-        provider_registry.register(AnthropicChatAdapter(factory, model_catalog))
+    for adapter_cls in adapter_classes:
+        meta = adapter_cls.adapter_meta
 
-    if env_settings.google_api_key:
-        provider_registry.register(GoogleChatAdapter(factory, model_catalog))
+        # Para providers cloud: verificar que la API key esté presente
+        if meta.env_key_name:
+            api_key = env_settings.get_provider_key(meta.env_key_name)
+            if not api_key:
+                # Sin key → no registrar (comportamiento silencioso igual que antes)
+                continue
 
-    if env_settings.xai_api_key:
-        provider_registry.register(XAIChatAdapter(factory, model_catalog))
+        # Para providers locales: registrar siempre si el paquete está disponible
+        if meta.is_local:
+            missing = _check_required_packages(meta.required_packages)
+            if missing:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Provider local '%s' no registrado: faltan paquetes %s",
+                    meta.provider_code,
+                    missing,
+                )
+                continue
+
+        try:
+            provider_registry.register(adapter_cls(factory, model_catalog))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning(
+                "No se pudo registrar el adapter '%s': %s",
+                meta.provider_code,
+                exc,
+            )
 
     return provider_registry
 
+
+def _check_required_packages(packages: list[str]) -> list[str]:
+    """Retorna la lista de paquetes que no están instalados."""
+    missing = []
+    for pkg in packages:
+        try:
+            __import__(pkg)
+        except ImportError:
+            missing.append(pkg)
+    return missing
 
 def validate_provider_registry_against_catalog(
     provider_registry: ProviderRegistry,
