@@ -1,6 +1,6 @@
 from gitingest import ingest
 
-summary, tree, content = ingest(".")
+summary, tree, content = ingest(r".")
 
 FILE_NAME = "code_prompt.txt"
 with open(FILE_NAME, "w", encoding="utf-8") as f:
