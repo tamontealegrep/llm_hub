@@ -3,7 +3,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from app.shared.settings.env import EnvSettings
 from app.shared.exceptions import ProviderConfigurationError
 from app.capabilities.chat.contracts import ChatRequestConfig
-from app.runtime.providers.langchain.chat.base import ProviderAdapterMeta
+from app.runtime.providers.langchain.chat.core import ProviderAdapterMeta
 from app.runtime.providers.langchain.model_builders import BUILDER_REGISTRY
 
 
