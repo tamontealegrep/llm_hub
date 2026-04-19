@@ -4,6 +4,7 @@ from enum import Enum
 from uuid import UUID, uuid4
 
 from app.tools.contracts import ToolCall
+from app.files.entities import FileAttachmentRef
 
 
 def utcnow() -> datetime:
@@ -27,6 +28,7 @@ class ConversationMessage:
     name: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
     created_at: datetime = field(default_factory=utcnow)
+    attachments: list[FileAttachmentRef] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.role == ConversationRole.TOOL and not self.tool_call_id:
@@ -46,6 +48,15 @@ class ConversationMessage:
 
         if any(not isinstance(tool_call, ToolCall) for tool_call in self.tool_calls):
             raise ValueError("tool_calls debe contener instancias de ToolCall")
+        
+        if self.attachments and self.role != ConversationRole.USER:
+            raise ValueError(
+                "Solo los mensajes con role=USER pueden incluir attachments. "
+                f"Role recibido: {self.role!r}"
+            )
+
+        if any(not isinstance(a, FileAttachmentRef) for a in self.attachments):
+            raise ValueError("attachments debe contener instancias de FileAttachmentRef")
 
 
 @dataclass(slots=True)
@@ -74,10 +85,15 @@ class ConversationSession:
             self.current_model_key = model_key
         self.touch()
 
-    def add_user_message(self, content: str) -> ConversationMessage:
+    def add_user_message(
+            self,
+            content: str,
+            attachments: list[FileAttachmentRef] | None = None,
+        ) -> ConversationMessage:
         message = ConversationMessage(
             role=ConversationRole.USER,
             content=content,
+            attachments=list(attachments or [])
         )
         self.messages.append(message)
         self.touch()

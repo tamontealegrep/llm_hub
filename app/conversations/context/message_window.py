@@ -40,6 +40,7 @@ class MessageWindowContextBuilder(ConversationContextBuilder):
                     ChatMessage(
                         role="user",
                         content=message.content,
+                        attachments=list(message.attachments),
                     )
                 )
 

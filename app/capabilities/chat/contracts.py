@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Literal
  
 from app.tools.contracts import ToolCall, ToolDefinition
+from app.files.entities import FileAttachmentRef
 from app.capabilities.common.models import TokenUsage
  
  
@@ -26,6 +27,7 @@ class ChatMessage:
     tool_call_id: str | None = None
     name: str | None = None
     tool_calls: list[ToolCall] = field(default_factory=list)
+    attachments: list[FileAttachmentRef] = field(default_factory=list)
  
     def __post_init__(self) -> None:
         if self.role == "tool" and not self.tool_call_id:
@@ -43,6 +45,12 @@ class ChatMessage:
         if self.tool_calls and self.role != "assistant":
             raise ValueError(
                 "Solo los mensajes con role='assistant' pueden incluir tool_calls. "
+                f"Role recibido: {self.role!r}"
+            )
+        
+        if self.attachments and self.role != "user":
+            raise ValueError(
+                "Solo los mensajes con role='user' pueden incluir attachments. "
                 f"Role recibido: {self.role!r}"
             )
  
