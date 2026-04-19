@@ -1,6 +1,4 @@
-# app/runtime/providers/langchain/chat/base.py
-# Re-exportaciones de compatibilidad.
-# Este archivo se irá vaciando a medida que se migran los imports.
+# app/runtime/providers/langchain/chat/core/__init__.py
 from app.runtime.providers.langchain.chat.core.meta import ProviderAdapterMeta
 from app.runtime.providers.langchain.chat.core.base_adapter import BaseLangChainChatAdapter
 
