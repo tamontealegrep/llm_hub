@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import copy
 import json
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TYPE_CHECKING
 from uuid import uuid4
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -25,10 +27,12 @@ from app.capabilities.chat.contracts import (
     ChatStreamEvent,
     ChatStreamEventType,
 )
-from app.runtime.providers.langchain.factory import LangChainProviderFactory
 from app.runtime.providers.base import ChatProviderAdapter
 from app.tools.contracts import ToolCall, ToolDefinition
 from app.model_catalog.service import ModelCatalogService
+
+if TYPE_CHECKING:
+    from app.runtime.providers.langchain.factory import LangChainProviderFactory
 
 logger = logging.getLogger(__name__)
 
