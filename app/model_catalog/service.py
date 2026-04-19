@@ -8,6 +8,7 @@ from app.model_catalog.schemas import (
     CanonicalParameterSchema,
     ModelDefinitionSchema,
     ProviderCatalogSchema,
+    AttachmentPolicySchema
 )
 from app.shared.exceptions import (
     InvalidModelParameterValueError,
@@ -300,3 +301,23 @@ class ModelCatalogService:
                 "provider_priority": provider_priority,
             },
         )
+    
+    def get_attachment_policy(
+        self,
+        provider_code: str,
+        model_key: str,
+    ) -> AttachmentPolicySchema | None:
+        """
+        Retorna la política de attachments para el modelo,
+        o None si el modelo no tiene política definida.
+        """
+        model = self.get_model(provider_code, model_key)
+        return model.attachment_policy
+
+    def supports_file_input(self, provider_code: str, model_key: str) -> bool:
+        """Retorna True si el modelo declara soporte de archivos."""
+        return self.supports_capability(provider_code, model_key, "file_input")
+
+    def supports_native_image_input(self, provider_code: str, model_key: str) -> bool:
+        """Retorna True si el modelo acepta imágenes de forma nativa (vision)."""
+        return self.supports_capability(provider_code, model_key, "vision_input")

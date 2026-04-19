@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.files.entities import AttachmentHandlingMode
+
 
 class CanonicalParameterSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -65,6 +67,26 @@ class ModelDefaultsSchema(BaseModel):
     timeout_seconds: int | None = None
 
 
+class AttachmentPolicySchema(BaseModel):
+    """
+    Política de manejo de adjuntos para un modelo específico.
+
+    mode:
+      - native: el provider acepta el archivo directamente
+      - extract_text: siempre extraer texto antes de enviar
+      - hybrid: nativo si el modelo lo soporta, extract_text como fallback
+
+    None en cualquier campo = usar el global del hub.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: AttachmentHandlingMode = AttachmentHandlingMode.HYBRID
+    max_attachments: int = 10
+    max_file_size_mb: int = 20
+    accepted_mime_types: list[str] = Field(default_factory=list)
+
+
 class ModelDefinitionSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -76,6 +98,7 @@ class ModelDefinitionSchema(BaseModel):
     supported_params: dict[str, CanonicalParameterSchema] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
+    attachment_policy: AttachmentPolicySchema | None = None
 
     @model_validator(mode="after")
     def validate_definition(self) -> "ModelDefinitionSchema":

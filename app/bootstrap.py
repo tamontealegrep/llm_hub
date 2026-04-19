@@ -6,6 +6,12 @@ from app.conversations.context.message_window import MessageWindowContextBuilder
 from app.conversations.repository import InMemoryConversationRepository
 from app.capabilities.chat.service import ChatService
 from app.capabilities.chat.contracts import ChatRequestConfig
+from app.files.service import FileService
+from app.files.repository import InMemoryFileRepository
+from app.files.storage import LocalFileStorage
+from app.files.extractors.text import TextFileExtractor
+from app.files.extractors.pdf import PdfFileExtractor
+from app.files.extractors.image import ImageFileExtractor
 from app.model_catalog.loader import load_model_catalog
 from app.model_catalog.repository import InMemoryModelCatalogRepository
 from app.model_catalog.service import ModelCatalogService
@@ -20,6 +26,19 @@ from app.tools.registry import ToolRegistry
 from app.tools.executor import ToolExecutor
 
 
+def build_file_service() -> FileService:
+    """Construye el FileService con los componentes por defecto."""
+    return FileService(
+        repository=InMemoryFileRepository(),
+        storage=LocalFileStorage(),
+        extractors=[
+            TextFileExtractor(),
+            PdfFileExtractor(),
+            ImageFileExtractor(),
+        ],
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class AppContainer:
     settings: RuntimeSettings
@@ -29,6 +48,7 @@ class AppContainer:
     chat_service: ChatService
     default_chat_provider_code: str
     default_chat_model_key: str
+    file_service: FileService | None = None 
 
 
 def build_model_catalog(settings: RuntimeSettings) -> ModelCatalogService:
@@ -130,6 +150,7 @@ def build_container(
     default_chat_config: ChatRequestConfig | None = None,
     with_builtin_tools: bool = False,
     with_custom_tools: bool = True,
+    with_file_service: bool = True,
 ) -> AppContainer:
     """
     Construye el contenedor principal de la aplicación.
@@ -196,6 +217,8 @@ def build_container(
 
     tool_executor = ToolExecutor(tool_registry)
 
+    file_service = build_file_service() if with_file_service else None 
+
     chat_service = ChatService(
         repository=repository,
         context_builder=context_builder,
@@ -206,6 +229,7 @@ def build_container(
         tool_executor=tool_executor,
         default_config=resolved_default_chat_config,
         max_tool_iterations=resolved_settings.app.defaults.max_tool_iterations,
+        file_service=file_service,
     )
 
     return AppContainer(
@@ -216,4 +240,5 @@ def build_container(
         chat_service=chat_service,
         default_chat_provider_code=default_provider_code,
         default_chat_model_key=default_model_key,
+        file_service=file_service,
     )

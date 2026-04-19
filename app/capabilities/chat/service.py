@@ -15,6 +15,10 @@ from app.capabilities.chat.contracts import (
     ChatStreamEvent,
     ChatStreamEventType,
 )
+from app.files.contracts import AttachmentInput
+from app.files.entities import FileAttachmentRef
+from app.files.service import FileService
+from app.files.validators import validate_attachment_count
 from app.runtime.execution.chat_orchestrator import ChatOrchestrator
 from app.runtime.providers.registry import ProviderRegistry
 from app.tools.contracts import ToolDefinition, ToolExecutionContext
@@ -37,6 +41,7 @@ class ChatService:
         tool_executor: ToolExecutor | None = None,
         default_config: ChatRequestConfig | None = None,
         max_tool_iterations: int = 8,
+        file_service: FileService | None = None,
     ) -> None:
         resolved_tool_registry = tool_registry or ToolRegistry()
         resolved_tool_executor = tool_executor or ToolExecutor(resolved_tool_registry)
@@ -50,6 +55,7 @@ class ChatService:
         self._tool_executor = resolved_tool_executor
         self._default_config = default_config or ChatRequestConfig()
         self._max_tool_iterations = max_tool_iterations
+        self._file_service = file_service
 
     # ------------------------------------------------------------------
     # API pública
@@ -114,6 +120,7 @@ class ChatService:
         provider_code: str | None = None,
         model_key: str | None = None,
         tool_names: list[str] | None = None,
+        attachments: list[AttachmentInput] | None = None,
     ) -> ChatCompletionResult:
         """
         Envía un mensaje y espera la respuesta completa.
@@ -135,11 +142,18 @@ class ChatService:
             )
         )
 
+        resolved_attachments = await self._resolve_attachments(
+            attachments=attachments,
+            provider_code=target_provider_code,
+            model_key=target_model_key,
+        )
+
         session = await self._prepare_session(
             session=session,
             user_text=user_text,
             target_provider_code=target_provider_code,
             target_model_key=target_model_key,
+            attachments=resolved_attachments,
         )
 
         for iteration in range(self._max_tool_iterations + 1):
@@ -185,6 +199,7 @@ class ChatService:
         provider_code: str | None = None,
         model_key: str | None = None,
         tool_names: list[str] | None = None,
+        attachments: list[AttachmentInput] | None = None,
     ) -> AsyncGenerator[ChatStreamEvent, None]:
         """
         Envía un mensaje en modo streaming con tool calling completo.
@@ -221,11 +236,18 @@ class ChatService:
             )
         )
 
+        resolved_attachments = await self._resolve_attachments(
+            attachments=attachments,
+            provider_code=target_provider_code,
+            model_key=target_model_key,
+        )
+
         session = await self._prepare_session(
             session=session,
             user_text=user_text,
             target_provider_code=target_provider_code,
             target_model_key=target_model_key,
+            attachments=resolved_attachments,
         )
 
         return self._stream_generator(
@@ -395,6 +417,7 @@ class ChatService:
         user_text: str,
         target_provider_code: str,
         target_model_key: str,
+        attachments: list[FileAttachmentRef] | None = None,
     ) -> ConversationSession:
         if (
             session.current_provider_code != target_provider_code
@@ -405,7 +428,10 @@ class ChatService:
                 model_key=target_model_key,
             )
 
-        session.add_user_message(user_text)
+        session.add_user_message(
+            user_text,
+            attachments=attachments or [],
+        )
         await self._repository.save(session)
         return session
 
@@ -436,6 +462,37 @@ class ChatService:
             model_key=session.current_model_key,
             metadata={"conversation_id": str(session.id)},
         )
+
+    async def _resolve_attachments(
+        self,
+        *,
+        attachments: list[AttachmentInput] | None,
+        provider_code: str,
+        model_key: str,
+    ) -> list[FileAttachmentRef]:
+        """
+        Resuelve AttachmentInput → FileAttachmentRef.
+        Valida el número de adjuntos contra la política del modelo.
+        """
+        if not attachments:
+            return []
+
+        if self._file_service is None:
+            raise RuntimeError(
+                "Se recibieron attachments pero FileService no está configurado. "
+                "Pasa file_service al construir ChatService."
+            )
+
+        policy = self._model_catalog.get_attachment_policy(provider_code, model_key)
+        max_count = policy.max_attachments if policy else 10
+        validate_attachment_count(len(attachments), max_count)
+
+        refs: list[FileAttachmentRef] = []
+        for attachment_input in attachments:
+            ref = await self._file_service.get_ref(attachment_input.file_id)
+            refs.append(ref)
+
+        return refs
 
     def _build_request(
         self,

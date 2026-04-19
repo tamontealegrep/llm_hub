@@ -1,12 +1,14 @@
 # app/runtime/providers/langchain/chat/core/base_adapter.py
 from __future__ import annotations
 
+import base64
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from typing import Any, ClassVar, TYPE_CHECKING
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import HumanMessage
 
 from app.shared.exceptions import (
     AppError,
@@ -22,6 +24,8 @@ from app.capabilities.chat.contracts import (
     ChatStreamEvent,
     ChatStreamEventType,
 )
+from app.capabilities.chat.contracts import ChatMessage
+from app.files.entities import FileAttachmentRef
 from app.runtime.providers.base import ChatProviderAdapter
 from app.model_catalog.service import ModelCatalogService
 
@@ -119,7 +123,36 @@ class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
             ) from exc
 
     def _prepare_messages(self, request: ChatRequest) -> list:
-        return to_langchain_messages(request.messages)
+        """
+        Prepara los mensajes para LangChain.
+        Ahora soporta attachments de forma multimodal y lee 'vision_input'
+        directamente desde el catálogo YAML (nada hardcodeado).
+        """
+        supports_vision = self._get_supports_vision(request)
+        return to_langchain_messages(
+            request.messages,
+            supports_vision=supports_vision
+        )
+
+    def _get_supports_vision(self, request: ChatRequest) -> bool:
+        """
+        Lee dinámicamente desde el catálogo de modelos (catalog/models/*.yaml)
+        si el modelo actual soporta vision_input.
+        
+        Esto hace que NO tengas que hardcodear nada en los adapters.
+        Si mañana agregas un nuevo modelo con vision_input: true en el YAML,
+        automáticamente lo usará.
+        """
+        # La mayoría de adapters tienen acceso al catálogo a través del factory
+        if hasattr(self, "_model_catalog") and self._model_catalog is not None:
+            return self._model_catalog.supports_capability(
+                request.provider_code,
+                request.model_key,
+                "vision_input"
+            )
+
+        # Fallback seguro (por si en algún adapter no está inyectado aún)
+        return False
 
     # ------------------------------------------------------------------
     # complete() — invocación sin streaming
@@ -279,3 +312,71 @@ class BaseLangChainChatAdapter(ChatProviderAdapter, ABC):
                 error_code=getattr(normalized, "error_code", "provider_error"),
                 error_message=str(normalized),
             )
+    
+    # ------------------------------------------------------------------
+    # File related helpers
+    # ------------------------------------------------------------------
+    def _model_supports_vision(self) -> bool:
+        """
+        Indica si este adapter concreto soporta entradas de imagen de forma nativa.
+        Los adapters de Anthropic, OpenAI y Google lo sobreescriben.
+        """
+        return False
+
+    def _build_human_message_with_attachments(self, message: ChatMessage) -> HumanMessage:
+        """
+        Construye HumanMessage multimodal (content blocks) cuando hay attachments.
+        Estrategia híbrida (exactamente como en el manual original):
+          - Texto del usuario siempre va primero.
+          - Imágenes → bloque nativo si el modelo lo soporta.
+          - Cualquier archivo → texto extraído o placeholder.
+        """
+        supports_vision = self._model_supports_vision()
+        content_blocks: list[dict[str, Any]] = []
+
+        # Texto del usuario
+        if message.content:
+            content_blocks.append({"type": "text", "text": message.content})
+
+        for attachment in message.attachments:
+            is_image = attachment.mime_type.startswith("image/")
+
+            if is_image and supports_vision:
+                # En fase futura podrás cargar los bytes reales y usar base64.
+                # Por ahora usamos el resolved_text (ya extraído en FileService).
+                if attachment.resolved_text:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": f"\n\n[Imagen adjunta: {attachment.filename}]\n{attachment.resolved_text}",
+                    })
+                else:
+                    content_blocks.append({
+                        "type": "text",
+                        "text": f"\n\n[Imagen adjunta: {attachment.filename} ({attachment.mime_type})]",
+                    })
+
+            elif attachment.resolved_text:
+                # Archivo de texto/PDF/etc. → lo insertamos como bloque de texto
+                content_blocks.append({
+                    "type": "text",
+                    "text": (
+                        f"\n\n--- Contenido de {attachment.filename} ---\n"
+                        f"{attachment.resolved_text}\n"
+                        "--- Fin del archivo ---"
+                    ),
+                })
+            else:
+                # Sin texto extraído
+                content_blocks.append({
+                    "type": "text",
+                    "text": (
+                        f"\n\n[Archivo adjunto: {attachment.filename} "
+                        f"({attachment.mime_type}) — sin contenido extraído]"
+                    ),
+                })
+
+        # Si solo hay un bloque de texto, LangChain lo acepta como string simple (más compatible)
+        if len(content_blocks) == 1 and content_blocks[0]["type"] == "text":
+            return HumanMessage(content=content_blocks[0]["text"])
+
+        return HumanMessage(content=content_blocks)
