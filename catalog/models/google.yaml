@@ -15,6 +15,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: true
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -45,6 +47,20 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: hybrid
+      max_attachments: 10
+      max_file_size_mb: 20
+      accepted_mime_types:
+        - application/pdf
+        - image/png
+        - image/jpeg
+        - image/webp
+        - image/gif
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - multimodal
@@ -62,6 +78,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: true
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -92,6 +110,20 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: hybrid
+      max_attachments: 10
+      max_file_size_mb: 20
+      accepted_mime_types:
+        - application/pdf
+        - image/png
+        - image/jpeg
+        - image/webp
+        - image/gif
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - multimodal
@@ -109,6 +141,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: true
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -139,6 +173,20 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: hybrid
+      max_attachments: 10
+      max_file_size_mb: 20
+      accepted_mime_types:
+        - application/pdf
+        - image/png
+        - image/jpeg
+        - image/webp
+        - image/gif
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - economical
@@ -157,6 +205,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: true
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -187,6 +237,20 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: hybrid
+      max_attachments: 10
+      max_file_size_mb: 20
+      accepted_mime_types:
+        - application/pdf
+        - image/png
+        - image/jpeg
+        - image/webp
+        - image/gif
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - reasoning

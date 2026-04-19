@@ -15,6 +15,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: false
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -45,6 +47,15 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: extract_text
+      max_attachments: 5
+      max_file_size_mb: 10
+      accepted_mime_types:
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - general-purpose
@@ -61,6 +72,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: false
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -91,6 +104,15 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: extract_text
+      max_attachments: 5
+      max_file_size_mb: 10
+      accepted_mime_types:
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - economical
@@ -108,6 +130,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: false
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -138,6 +162,15 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: extract_text
+      max_attachments: 5
+      max_file_size_mb: 10
+      accepted_mime_types:
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - premium
@@ -155,6 +188,8 @@ models:
       streaming: true
       structured_output: true
       vision_input: false
+      file_input: true
+      pdf_input: true
     defaults:
       temperature: 0.2
       top_p: 1.0
@@ -185,6 +220,15 @@ models:
         supported: true
       stream:
         supported: true
+    attachment_policy:
+      mode: extract_text
+      max_attachments: 5
+      max_file_size_mb: 10
+      accepted_mime_types:
+        - text/plain
+        - text/markdown
+        - application/json
+        - text/csv
     tags:
       - chat
       - reasoning
